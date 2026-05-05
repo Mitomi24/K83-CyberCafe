@@ -46,9 +46,9 @@ export const PrintingForm: React.FC<PrintingFormProps> = ({ onAdd, currency }) =
         undefined,
         {
           platform,
-          customerName: customerName || undefined,
-          fileLink: fileLink || undefined,
-          remarks: remarks || undefined,
+          customerName: customerName.trim() || "",
+          fileLink: fileLink.trim() || "",
+          remarks: remarks.trim() || "",
         }
       );
       
