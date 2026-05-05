@@ -151,6 +151,35 @@ export function useData() {
     }
   };
 
+  const updateEntry = async (id: string, updates: Partial<DailyEntry>) => {
+    if (!user) return;
+    const path = `users/${user.uid}/entries/${id}`;
+    try {
+      const dataToUpdate = { ...updates };
+      
+      // Handle date conversion if it's a Date object
+      if (updates.date && updates.date instanceof Date) {
+        dataToUpdate.date = Timestamp.fromDate(updates.date);
+      }
+
+      // If this is a cybercafe entry, recalculate energy cost if dependencies changed
+      const existingEntry = entries.find(e => e.id === id);
+      if (existingEntry && (existingEntry.category || 'cybercafe') === 'cybercafe') {
+        const wattage = updates.wattageUsage !== undefined ? updates.wattageUsage : (existingEntry.wattageUsage || 0);
+        const hours = updates.durationHours !== undefined ? updates.durationHours : (existingEntry.durationHours || 0);
+        const rate = updates.kwhRate !== undefined ? updates.kwhRate : (existingEntry.kwhRate || settings?.kwhRate || 0);
+        
+        if (updates.wattageUsage !== undefined || updates.durationHours !== undefined || updates.kwhRate !== undefined) {
+          (dataToUpdate as any).energyCost = (wattage / 1000) * hours * rate;
+        }
+      }
+
+      await updateDoc(doc(db, path), dataToUpdate);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  };
+
   const clearAllEntries = async (onProgress?: (deleted: number, total: number) => void) => {
     if (!user) return;
     const { writeBatch, getDocs, collection: fCollection, query: fQuery, limit: fLimit } = await import('firebase/firestore');
@@ -360,5 +389,5 @@ export function useData() {
     }
   };
 
-  return { entries, expenses, loading, addEntry, addExpense, removeEntry, removeExpense, clearAllEntries, clearAllExpenses, clearAllData, restoreBackup, recalculateAllEntryCosts };
+  return { entries, expenses, loading, addEntry, addExpense, removeEntry, removeExpense, updateEntry, clearAllEntries, clearAllExpenses, clearAllData, restoreBackup, recalculateAllEntryCosts };
 }

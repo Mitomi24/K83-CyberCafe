@@ -1,14 +1,26 @@
-import React, { useState } from 'react';
-import { Zap, DollarSign, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Zap, DollarSign, Clock, X, Save } from 'lucide-react';
+import { DailyEntry } from '../types';
 
 interface EntryFormProps {
   onAdd: (income: number, wattage: number, hours: number, date?: Date, kwhRate?: number, loggedBy?: 'Tom' | 'Gen', meterReading?: number) => Promise<void>;
+  onUpdate?: (id: string, updates: Partial<DailyEntry>) => Promise<void>;
+  editingEntry?: DailyEntry | null;
+  onCancel?: () => void;
   currency: string;
   defaultKwhRate: number;
   latestMeterReading?: number;
 }
 
-export const EntryForm: React.FC<EntryFormProps> = ({ onAdd, currency, defaultKwhRate, latestMeterReading }) => {
+export const EntryForm: React.FC<EntryFormProps> = ({ 
+  onAdd, 
+  onUpdate,
+  editingEntry,
+  onCancel,
+  currency, 
+  defaultKwhRate, 
+  latestMeterReading 
+}) => {
   const [income, setIncome] = useState('');
   const [wattage, setWattage] = useState('');
   const [meterReading, setMeterReading] = useState('');
@@ -18,20 +30,38 @@ export const EntryForm: React.FC<EntryFormProps> = ({ onAdd, currency, defaultKw
   const [loggedBy, setLoggedBy] = useState<'Tom' | 'Gen'>('Gen');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (editingEntry) {
+      setIncome(editingEntry.grossIncome.toString());
+      setWattage(editingEntry.wattageUsage.toString());
+      setMeterReading(editingEntry.meterReading?.toString() || '');
+      setHours(editingEntry.durationHours.toString());
+      setDate(editingEntry.date.toDate().toISOString().split('T')[0]);
+      setKwhRate((editingEntry.kwhRate || defaultKwhRate).toString());
+      setLoggedBy(editingEntry.loggedBy as any || 'Gen');
+    } else {
+      setIncome('');
+      setWattage('');
+      setMeterReading('');
+      setHours('12');
+      setDate(new Date().toISOString().split('T')[0]);
+      setKwhRate(defaultKwhRate.toString());
+      setLoggedBy('Gen');
+    }
+  }, [editingEntry, defaultKwhRate]);
+
   // Auto-calculate wattage if meter reading is provided
-  React.useEffect(() => {
-    if (meterReading && latestMeterReading != null) {
+  useEffect(() => {
+    if (meterReading && latestMeterReading != null && !editingEntry) {
       const current = parseFloat(meterReading);
       const diff = current - latestMeterReading;
       if (diff >= 0) {
-        // Daily Usage (kWh) = current - prev
-        // Watts = (kWh * 1000) / hours
         const h = parseFloat(hours) || 12;
         const computedWatts = (diff * 1000) / h;
         setWattage(computedWatts.toFixed(0));
       }
     }
-  }, [meterReading, latestMeterReading, hours]);
+  }, [meterReading, latestMeterReading, hours, editingEntry]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,25 +69,53 @@ export const EntryForm: React.FC<EntryFormProps> = ({ onAdd, currency, defaultKw
     
     setIsSubmitting(true);
     const selectedDate = new Date(date);
-    await onAdd(
-      Number(income), 
-      Number(wattage), 
-      Number(hours), 
-      selectedDate, 
-      Number(kwhRate), 
-      loggedBy, 
-      Number(meterReading)
-    );
-    setIncome('');
-    setWattage('0');
-    setMeterReading('');
+
+    if (editingEntry && onUpdate && editingEntry.id) {
+      await onUpdate(editingEntry.id, {
+        grossIncome: Number(income),
+        wattageUsage: Number(wattage),
+        durationHours: Number(hours),
+        date: selectedDate,
+        kwhRate: Number(kwhRate),
+        loggedBy,
+        meterReading: Number(meterReading)
+      });
+      if (onCancel) onCancel();
+    } else {
+      await onAdd(
+        Number(income), 
+        Number(wattage), 
+        Number(hours), 
+        selectedDate, 
+        Number(kwhRate), 
+        loggedBy, 
+        Number(meterReading)
+      );
+      setIncome('');
+      setWattage('0');
+      setMeterReading('');
+    }
     setIsSubmitting(false);
   };
 
   return (
-    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-      <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Record Financial Data</h2>
+    <div className={`bg-white p-5 rounded-xl border transition-all ${editingEntry ? 'border-amber-400 ring-2 ring-amber-100' : 'border-slate-200 shadow-sm'}`}>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          {editingEntry ? 'Edit Financial Data' : 'Record Financial Data'}
+        </h2>
+        {editingEntry && (
+          <button 
+            type="button"
+            onClick={onCancel}
+            className="p-1 hover:bg-amber-100 rounded-full transition-colors text-amber-700"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* ... rest of the form is the same ... */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5">
             Log Date
@@ -219,9 +277,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({ onAdd, currency, defaultKw
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-lg shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 text-sm uppercase tracking-widest"
+          className={`w-full font-bold py-3 rounded-lg shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 text-sm uppercase tracking-widest ${editingEntry ? 'bg-amber-600 hover:bg-slate-900' : 'bg-slate-800 hover:bg-slate-900'} text-white`}
         >
-          {isSubmitting ? 'Processing...' : 'Record Metrics'}
+          {isSubmitting ? 'Processing...' : (editingEntry ? 'Update Metrics' : 'Record Metrics')}
         </button>
       </form>
     </div>

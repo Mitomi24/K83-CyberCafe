@@ -5,7 +5,7 @@ import { EntryForm } from './EntryForm';
 import { useData } from '../lib/useData';
 import { useAuth } from '../lib/AuthContext';
 import { format } from 'date-fns';
-import { Trash2, History, Download, ChevronLeft, ChevronRight, ArrowUpDown, TrendingUp } from 'lucide-react';
+import { Trash2, History, Download, ChevronLeft, ChevronRight, ArrowUpDown, TrendingUp, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency, cn } from '../lib/utils';
 import * as XLSX from 'xlsx';
@@ -23,9 +23,10 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
-  const { entries, loading, addEntry, removeEntry, expenses, addExpense, removeExpense } = useData();
+  const { entries, loading, addEntry, removeEntry, updateEntry, expenses, addExpense, removeExpense } = useData();
   const { settings, user } = useAuth();
   const [activeSubTab, setActiveSubTab] = React.useState<'operations' | 'expenses'>('operations');
+  const [editingEntry, setEditingEntry] = React.useState<DailyEntry | null>(null);
   const [exportRange, setExportRange] = React.useState({
     start: '',
     end: ''
@@ -322,6 +323,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
               {category === 'cybercafe' ? (
                 <EntryForm 
                   onAdd={handleAddCategoryEntry} 
+                  onUpdate={updateEntry}
+                  editingEntry={editingEntry}
+                  onCancel={() => setEditingEntry(null)}
                   currency={settings.currency} 
                   defaultKwhRate={settings.kwhRate} 
                   latestMeterReading={filteredEntries[0]?.meterReading}
@@ -329,6 +333,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
               ) : (
                 <PrintingForm
                   onAdd={handleAddCategoryEntry}
+                  onUpdate={updateEntry}
+                  editingEntry={editingEntry}
+                  onCancel={() => setEditingEntry(null)}
                   currency={settings.currency}
                 />
               )}
@@ -596,16 +603,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
                                 </>
                               )}
                               <td className="px-6 py-4 text-right">
-                                <button 
-                                  onClick={() => {
-                                    if (window.confirm("Permanently delete this entry?")) {
-                                      entry.id && removeEntry(entry.id);
-                                    }
-                                  }}
-                                  className="text-slate-300 hover:text-red-500 p-2 transition-colors rounded-lg hover:bg-red-50"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                                <div className="flex items-center justify-end gap-1">
+                                  <button 
+                                    onClick={() => {
+                                      setEditingEntry(entry);
+                                      // Scroll to form
+                                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                    className="text-slate-300 hover:text-amber-500 p-2 transition-colors rounded-lg hover:bg-amber-50"
+                                    title="Edit Entry"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      if (window.confirm("Permanently delete this entry?")) {
+                                        entry.id && removeEntry(entry.id);
+                                      }
+                                    }}
+                                    className="text-slate-300 hover:text-red-500 p-2 transition-colors rounded-lg hover:bg-red-50"
+                                    title="Delete Entry"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
                               </td>
                             </motion.tr>
                           ))
