@@ -1,20 +1,36 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Tomi & Gen Business Manager
 
-# Run and deploy your AI Studio app
+A full-stack application for managing Cybercafe and Printing business operations, featuring energy cost tracking, transaction history, and performance analytics.
 
-This contains everything you need to run your app locally.
+## 🚀 How to Run Locally
 
-View your app in AI Studio: https://ai.studio/apps/e237cc57-2ec1-4de2-8bd5-4ccbc177adb4
+1. **Prerequisites**
+   - Install [Node.js](https://nodejs.org/) (LTS version recommended).
+   - A Firebase project (already configured in this repository).
 
-## Run Locally
+2. **Setup (Run these in your Terminal/Command Prompt)**
+   ```bash
+   # 1. Open your terminal and 'cd' into the project folder
+   # 2. Install dependencies
+   npm install
+   # 3. Start the app
+   npm run dev
+   ```
+   The app will be available at `http://localhost:3000`.
 
-**Prerequisites:**  Node.js
+## 🌐 Deploying to GitHub Pages (Free Hosting)
 
+GitHub provides a free domain: `https://username.github.io/repo-name/`
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. **Export**: Use "Settings" > "Export to GitHub" in AI Studio.
+2. **Workflow**: I've already added `.github/workflows/deploy.yml` to your project.
+3. **Activate**:
+   - Go to your GitHub Repo **Settings** > **Pages**.
+   - Change "Source" from "Deploy from a branch" to **GitHub Actions**.
+4. **Done**: Your site will deploy automatically every time you push code!
+
+## 🛠 Features
+- **Dual System**: Switch between Cybercafe (Energy tracking) and Printing (Job tracking) modes.
+- **Analytics**: Peak daily/weekly/monthly stats with specific dates and customer counts.
+- **Data Export**: Export your operational history to Excel (XLSX).
+- **Secure**: Powered by Firebase Authentication and Firestore.
