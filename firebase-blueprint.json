@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Global settings for the user",
+      "type": "object",
+      "properties": {
+        "kwhRate": { "type": "number", "description": "Cost per kWh" },
+        "currency": { "type": "string", "description": "Currency symbol" },
+        "displayName": { "type": "string" }
+      },
+      "required": ["kwhRate", "currency"]
+    },
+    "Entry": {
+      "title": "Daily Entry",
+      "description": "Daily income and energy usage",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date-time" },
+        "grossIncome": { "type": "number" },
+        "wattageUsage": { "type": "number" },
+        "durationHours": { "type": "number" },
+        "energyCost": { "type": "number" }
+      },
+      "required": ["date", "grossIncome", "wattageUsage"]
+    },
+    "Expense": {
+      "title": "Business Expense",
+      "description": "Other business costs",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "amount", "date"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profile and settings"
+    },
+    "users/{userId}/entries/{entryId}": {
+      "schema": "Entry",
+      "description": "Daily tracking logs"
+    },
+    "users/{userId}/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Business expenses"
+    }
+  }
+}

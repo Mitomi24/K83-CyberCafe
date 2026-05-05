@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 0.1 Global Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // Validation Blueprints
+    function isValidUser(data) {
+      return data.keys().hasAll(['kwhRate', 'currency']) 
+        && data.kwhRate is number && data.kwhRate >= 0
+        && data.currency is string && data.currency.size() <= 10;
+    }
+
+    function isValidEntry(data) {
+      return data.keys().hasAll(['date', 'grossIncome', 'wattageUsage', 'energyCost'])
+        && data.date is timestamp
+        && data.grossIncome is number && data.grossIncome >= 0
+        && data.wattageUsage is number && data.wattageUsage >= 0
+        && data.energyCost is number;
+    }
+
+    function isValidExpense(data) {
+      return data.keys().hasAll(['name', 'amount', 'date'])
+        && data.name is string && data.name.size() <= 200
+        && data.amount is number && data.amount >= 0
+        && data.date is timestamp;
+    }
+
+    // Collection Rules
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidUser(request.resource.data);
+      
+      match /entries/{entryId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidEntry(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /expenses/{expenseId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidExpense(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
