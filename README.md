@@ -29,6 +29,14 @@ GitHub provides a free domain: `https://username.github.io/repo-name/`
    - Change "Source" from "Deploy from a branch" to **GitHub Actions**.
 4. **Done**: Your site will deploy automatically every time you push code!
 
+## 🚨 Troubleshooting
+
+### "auth/unauthorized-domain" Error
+If you see this error when logging in:
+1. Go to [Firebase Console](https://console.firebase.google.com/).
+2. Navigate to **Authentication** > **Settings** > **Authorized Domains**.
+3. Add your deployment domain (e.g., `yourusername.github.io`) and `localhost` to the list.
+
 ## 🛠 Features
 - **Dual System**: Switch between Cybercafe (Energy tracking) and Printing (Job tracking) modes.
 - **Analytics**: Peak daily/weekly/monthly stats with specific dates and customer counts.
