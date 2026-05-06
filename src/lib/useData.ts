@@ -389,5 +389,71 @@ export function useData() {
     }
   };
 
-  return { entries, expenses, loading, addEntry, addExpense, removeEntry, removeExpense, updateEntry, clearAllEntries, clearAllExpenses, clearAllData, restoreBackup, recalculateAllEntryCosts };
+  const createBackup = (): AppBackup => {
+    return {
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      settings: settings || { kwhRate: 0, currency: '₱' },
+      entries,
+      expenses
+    };
+  };
+
+  const uploadToDrive = async (manualBackup?: AppBackup) => {
+    if (!settings?.googleDriveBackup?.enabled || !settings?.googleDriveBackup?.tokens) {
+      return;
+    }
+
+    const backup = manualBackup || createBackup();
+    
+    try {
+      const response = await fetch('/api/backup/drive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokens: settings.googleDriveBackup.tokens,
+          backup,
+          folderId: settings.googleDriveBackup.folderId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Drive upload failed');
+      }
+
+      const result = await response.json();
+      
+      // Update last backup date and tokens if refreshed
+      const today = new Date().toISOString().split('T')[0];
+      await updateSettings({
+        ...settings,
+        googleDriveBackup: {
+          ...settings.googleDriveBackup,
+          lastBackupDate: today,
+          tokens: result.newTokens || settings.googleDriveBackup.tokens
+        }
+      });
+
+      return result.fileId;
+    } catch (error) {
+      console.error('Auto backup error:', error);
+      throw error;
+    }
+  };
+
+  const triggerAutoBackup = async () => {
+    if (!settings?.googleDriveBackup?.enabled || !settings?.googleDriveBackup?.tokens) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    if (settings.googleDriveBackup.lastBackupDate === today) return;
+
+    console.log('Triggering daily auto-backup to Google Drive...');
+    try {
+      await uploadToDrive();
+    } catch (e) {
+      console.error('Daily backup failed:', e);
+    }
+  };
+
+  return { entries, expenses, loading, addEntry, addExpense, removeEntry, removeExpense, updateEntry, clearAllEntries, clearAllExpenses, clearAllData, restoreBackup, recalculateAllEntryCosts, createBackup, uploadToDrive, triggerAutoBackup, updateSettings };
 }

@@ -15,7 +15,11 @@ service cloud.firestore {
     function isValidUser(data) {
       return data.keys().hasAll(['kwhRate', 'currency']) 
         && data.kwhRate is number && data.kwhRate >= 0
-        && data.currency is string && data.currency.size() <= 10;
+        && data.currency is string && data.currency.size() <= 10
+        && (!data.keys().hasAny(['googleDriveBackup']) || (
+          data.googleDriveBackup is map
+          && data.googleDriveBackup.enabled is bool
+        ));
     }
 
     function isValidEntry(data) {
@@ -34,6 +38,10 @@ service cloud.firestore {
     }
 
     // Collection Rules
+    match /system/connection_test {
+      allow read: if isSignedIn();
+    }
+
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow create, update: if isOwner(userId) && isValidUser(request.resource.data);

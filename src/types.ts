@@ -45,7 +45,14 @@ export interface KwhRateRange {
 export interface UserSettings {
   kwhRate: number;
   currency: string;
+  theme?: 'light' | 'dark';
   rateHistory?: KwhRateRange[];
+  googleDriveBackup?: {
+    enabled: boolean;
+    folderId?: string;
+    lastBackupDate?: string | null;
+    tokens?: any;
+  };
 }
 
 export interface DateRange {

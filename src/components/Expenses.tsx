@@ -35,7 +35,7 @@ export const Expenses: React.FC<ExpensesProps> = ({ expenses, settings, onAdd, o
   };
 
   return (
-    <div className={cn("max-w-7xl mx-auto", isCompact ? "py-0" : "py-8 px-4 sm:px-6 lg:px-8")}>
+    <div className={cn("max-w-none mx-auto", isCompact ? "py-0" : "py-8 px-4 sm:px-6 lg:px-12")}>
       {!isCompact && (
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Overhead & Recurring Expenses</h2>

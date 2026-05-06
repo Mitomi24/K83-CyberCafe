@@ -30,15 +30,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Fetch user settings
-        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-        if (userDoc.exists()) {
-          setSettings(userDoc.data() as UserSettings);
-        } else {
-          // Default settings
-          const defaultSettings = { kwhRate: 12, currency: 'Php' };
-          await setDoc(doc(db, 'users', currentUser.uid), defaultSettings);
-          setSettings(defaultSettings);
+        try {
+          // Fetch user settings
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists()) {
+            setSettings(userDoc.data() as UserSettings);
+          } else {
+            // Default settings
+            const defaultSettings: UserSettings = { kwhRate: 12, currency: 'Php', theme: 'light' };
+            await setDoc(doc(db, 'users', currentUser.uid), defaultSettings);
+            setSettings(defaultSettings);
+          }
+        } catch (error) {
+          console.error("Failed to fetch user settings:", error);
+          // Fallback to minimal settings if fetch fails
+          if (!settings) {
+            setSettings({ kwhRate: 12, currency: 'Php' });
+          }
         }
       } else {
         setSettings(null);
@@ -65,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateSettings = async (newSettings: UserSettings) => {
     if (!user) return;
     await setDoc(doc(db, 'users', user.uid), newSettings, { merge: true });
-    setSettings(newSettings);
+    setSettings(prev => prev ? { ...prev, ...newSettings } : newSettings);
   };
 
   return (

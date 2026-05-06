@@ -5,7 +5,7 @@ import { EntryForm } from './EntryForm';
 import { useData } from '../lib/useData';
 import { useAuth } from '../lib/AuthContext';
 import { format } from 'date-fns';
-import { Trash2, History, Download, ChevronLeft, ChevronRight, ArrowUpDown, TrendingUp, Edit2 } from 'lucide-react';
+import { Trash2, History as HistoryIcon, Download, ChevronLeft, ChevronRight, ArrowUpDown, TrendingUp, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency, cn } from '../lib/utils';
 import * as XLSX from 'xlsx';
@@ -23,10 +23,16 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
-  const { entries, loading, addEntry, removeEntry, updateEntry, expenses, addExpense, removeExpense } = useData();
+  const { entries, loading, addEntry, removeEntry, updateEntry, expenses, addExpense, removeExpense, triggerAutoBackup } = useData();
   const { settings, user } = useAuth();
   const [activeSubTab, setActiveSubTab] = React.useState<'operations' | 'expenses'>('operations');
   const [editingEntry, setEditingEntry] = React.useState<DailyEntry | null>(null);
+
+  React.useEffect(() => {
+    if (!loading && user && settings) {
+      triggerAutoBackup();
+    }
+  }, [loading, user, settings, triggerAutoBackup]);
   const [exportRange, setExportRange] = React.useState({
     start: '',
     end: ''
@@ -35,11 +41,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
   
   // Pagination and Sorting state
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [itemsPerPage, setItemsPerPage] = React.useState(5);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({
     key: 'date',
     direction: 'desc'
   });
-  const ITEMS_PER_PAGE = 15;
 
   // Filter content by category
   const filteredEntries = React.useMemo(() => {
@@ -93,11 +99,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
   }, [filteredEntries, sortConfig]);
 
   const paginatedEntries = React.useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return sortedEntries.slice(start, start + ITEMS_PER_PAGE);
-  }, [sortedEntries, currentPage]);
+    const start = (currentPage - 1) * itemsPerPage;
+    return sortedEntries.slice(start, start + itemsPerPage);
+  }, [sortedEntries, currentPage, itemsPerPage]);
 
-  const totalPages = Math.ceil(filteredEntries.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
 
   const toggleSort = (key: SortKey) => {
     setSortConfig(current => ({
@@ -278,7 +284,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <div className="max-w-none mx-auto py-6 px-4 sm:px-6 lg:px-12">
       <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -343,21 +349,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
               )}
               
               <div className="space-y-3">
-                <div className="bg-slate-900 text-white p-5 rounded-xl border border-slate-800 shadow-sm flex items-center justify-between">
+                <div className="bg-white text-slate-800 p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between transition-colors">
                   <div>
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest opacity-60">
+                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">
                       {category === 'cybercafe' ? 'Gross Revenue' : 'Total Revenue'}
                     </p>
-                    <h4 className="text-2xl font-black mt-1">
+                    <h4 className="text-2xl font-black mt-1 text-slate-900">
                       {formatCurrency(filteredEntries.reduce((acc, curr) => acc + curr.grossIncome, 0), settings.currency)}
                     </h4>
                     {category === 'printing' && (
-                      <p className="text-[10px] font-bold text-emerald-400 mt-1 uppercase tracking-tighter">
+                      <p className="text-[10px] font-bold text-emerald-600 mt-1 uppercase tracking-tighter">
                         {filteredEntries.length} Transactions Recorded
                       </p>
                     )}
                   </div>
-                  <TrendingUp className="text-emerald-400" size={24} />
+                  <TrendingUp className="text-emerald-500" size={24} />
                 </div>
 
                 <div className="grid grid-cols-1 gap-2">
@@ -449,40 +455,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
               
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between">
-                  <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                    <History size={18} className="text-slate-400" />
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm uppercase tracking-tight">
+                    <HistoryIcon size={18} className="text-slate-400" />
                     {category === 'cybercafe' ? 'Operational History' : 'Transaction History'}
                   </h3>
-                  <div className="flex items-center gap-2">
-                    {showExportOptions && (
-                      <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-1 animate-in fade-in slide-in-from-right-4">
-                        <input 
-                          type="date" 
-                          value={exportRange.start}
-                          onChange={(e) => setExportRange(prev => ({ ...prev, start: e.target.value }))}
-                          className="text-[10px] p-1 outline-none border-r border-slate-100"
-                        />
-                        <input 
-                          type="date" 
-                          value={exportRange.end}
-                          onChange={(e) => setExportRange(prev => ({ ...prev, end: e.target.value }))}
-                          className="text-[10px] p-1 outline-none"
-                        />
-                      </div>
-                    )}
-                    <button 
-                      onClick={() => setShowExportOptions(!showExportOptions)}
-                      className={`flex items-center gap-2 px-3 py-1.5 border rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm active:scale-95 ${showExportOptions ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-600'}`}
-                    >
-                      Range
-                    </button>
-                    <button 
-                      onClick={exportToExcel}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-800 rounded-lg text-[10px] font-bold text-white uppercase tracking-widest hover:bg-slate-900 transition-all shadow-sm active:scale-95"
-                    >
-                      <Download size={14} />
-                      Export {exportRange.start && exportRange.end ? 'Range' : 'All'}
-                    </button>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Show</span>
+                      <select 
+                        value={itemsPerPage}
+                        onChange={(e) => {
+                          setItemsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="text-[10px] font-bold text-slate-600 bg-white border border-slate-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -601,7 +595,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
                                       {entry.platform || 'N/A'}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 text-[11px] text-slate-500 max-w-[200px] truncate italic">
+                                  <td className="px-6 py-4 text-[11px] text-slate-500 max-w-[200px] truncate italic group relative cursor-help" title={entry.remarks || 'No remarks'}>
                                     {entry.remarks || '—'}
                                   </td>
                                 </>
@@ -640,10 +634,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
                   </table>
                 </div>
                 
-                {filteredEntries.length > ITEMS_PER_PAGE && (
+                {filteredEntries.length > itemsPerPage && (
                   <div className="p-4 border-t border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <p className="text-xs text-slate-400 font-medium order-2 sm:order-1">
-                      Showing <span className="font-bold text-slate-600">{(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredEntries.length)}</span> of <span className="font-bold text-slate-600">{filteredEntries.length}</span> entries
+                    <p className="text-xs text-slate-400 font-medium order-2 sm:order-1 outline-none">
+                      Showing <span className="font-bold text-slate-600">{(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredEntries.length)}</span> of <span className="font-bold text-slate-600">{filteredEntries.length}</span> entries
                     </p>
                     <div className="flex items-center gap-1 order-1 sm:order-2 flex-wrap justify-center">
                       <button

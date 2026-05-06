@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserSettings, AppBackup } from '../types';
-import { Save, Settings as SettingsIcon, Info, Database, Trash2, AlertTriangle, Calendar, Plus, RefreshCw, Download, UploadCloud } from 'lucide-react';
+import { Settings as SettingsIcon, Info, Database, Trash2, AlertTriangle, Calendar, Plus, RefreshCw, Download, UploadCloud, Link as LinkIcon, CheckCircle2, CloudOff, HardDrive, Pencil, X, History as HistoryIcon } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useData } from '../lib/useData';
 
@@ -11,12 +11,20 @@ interface SettingsProps {
 
 export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
   const { user } = useAuth();
-  const { clearAllData, restoreBackup, recalculateAllEntryCosts, entries, expenses } = useData();
+  const { clearAllData, restoreBackup, recalculateAllEntryCosts, entries, expenses, uploadToDrive } = useData();
   const [kwhRate, setKwhRate] = useState(settings.kwhRate.toString());
   const [currency, setCurrency] = useState(settings.currency);
   const [rateHistory, setRateHistory] = useState(settings.rateHistory || []);
+
+  // Sync state with props
+  React.useEffect(() => {
+    setKwhRate(settings.kwhRate.toString());
+    setCurrency(settings.currency);
+    setRateHistory(settings.rateHistory || []);
+  }, [settings]);
+
   const [newRange, setNewRange] = useState({ startDate: '', endDate: '', rate: '' });
-  const [isSaving, setIsSaving] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [deletionProgress, setDeletionProgress] = useState<{ current: number, total: number, active: boolean, phase: 'entries' | 'expenses' | null }>({
     current: 0,
@@ -34,7 +42,115 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
 
   const [isConfirmingWipe, setIsConfirmingWipe] = useState(false);
   const [wipeConfirmText, setWipeConfirmText] = useState('');
-  const [showRecalculateConfirm, setShowRecalculateConfirm] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<any[]>([]);
+  const [isLoadingDriveFiles, setIsLoadingDriveFiles] = useState(false);
+  const [isUploadingToDrive, setIsUploadingToDrive] = useState(false);
+
+  const handleManualCloudBackup = async () => {
+    setIsUploadingToDrive(true);
+    try {
+      await uploadToDrive();
+      alert("Manual backup uploaded to Google Drive successfully.");
+      await fetchDriveBackups(); // Refresh list
+    } catch (e) {
+      console.error(e);
+      alert("Failed to upload manual backup to Drive.");
+    }
+    setIsUploadingToDrive(false);
+  };
+
+  const fetchDriveBackups = async () => {
+    if (!settings.googleDriveBackup?.tokens || !settings.googleDriveBackup?.folderId) return;
+    
+    setIsLoadingDriveFiles(true);
+    try {
+      const response = await fetch('/api/backup/drive/list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokens: settings.googleDriveBackup.tokens,
+          folderId: settings.googleDriveBackup.folderId
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDriveFiles(data.files);
+        if (data.newTokens) {
+          await onUpdate({
+            ...settings,
+            googleDriveBackup: {
+              ...settings.googleDriveBackup,
+              tokens: data.newTokens
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to fetch cloud backups.");
+    }
+    setIsLoadingDriveFiles(false);
+  };
+
+  const handleRestoreFromDrive = async (fileId: string) => {
+    if (!settings.googleDriveBackup?.tokens) return;
+
+    try {
+      const confirmRestore = window.confirm("WARNING: Restoring a cloud backup will wipe all current data and replace it with the backup content. This cannot be undone. Proceed?");
+      if (!confirmRestore) return;
+
+      setRestoreProgress({ current: 0, total: 0, active: true, phase: null });
+
+      const response = await fetch('/api/backup/drive/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tokens: settings.googleDriveBackup.tokens,
+          fileId
+        })
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        let backup: AppBackup = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
+        
+        if (!backup.version || !backup.settings || !Array.isArray(backup.entries)) {
+          alert("Invalid cloud backup format.");
+          setRestoreProgress({ current: 0, total: 0, active: false, phase: null });
+          return;
+        }
+
+        // Optimization: Preserve the current Drive tokens even if the backup has old ones
+        if (settings.googleDriveBackup?.tokens) {
+          backup = {
+            ...backup,
+            settings: {
+              ...backup.settings,
+              googleDriveBackup: {
+                ...(backup.settings.googleDriveBackup || { enabled: false }),
+                enabled: settings.googleDriveBackup.enabled,
+                tokens: settings.googleDriveBackup.tokens,
+                folderId: settings.googleDriveBackup.folderId,
+                lastBackupDate: settings.googleDriveBackup.lastBackupDate
+              }
+            }
+          };
+        }
+
+        await restoreBackup(backup, (current, total, phase) => {
+          setRestoreProgress({ current, total, active: true, phase });
+        });
+
+        alert("Cloud backup restored successfully!");
+      } else {
+        alert("Failed to fetch backup content: " + data.error);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to restore cloud backup.");
+    }
+    setRestoreProgress({ current: 0, total: 0, active: false, phase: null });
+  };
 
   const handleSystemWipe = async () => {
     if (wipeConfirmText !== 'DELETE ALL') return;
@@ -52,29 +168,82 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
     setDeletionProgress({ current: 0, total: 0, active: false, phase: null });
   };
 
-  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
-    if (e) e.preventDefault();
-    setIsSaving(true);
+  const handleConnectDrive = async () => {
     try {
-      await onUpdate({ kwhRate: Number(kwhRate), currency, rateHistory });
+      const response = await fetch(`/api/auth/google/url?uid=${user?.uid}`);
+      const { url } = await response.json();
+      const popup = window.open(url, 'google_auth', 'width=600,height=700');
       
-      // Check if user wants to recalculate after saving
-      if (rateHistory.length > 0) {
-        setShowRecalculateConfirm(true);
-      }
-    } catch (error) {
-      console.error("Save failed", error);
+      const handleMessage = async (event: MessageEvent) => {
+        if (event.data?.type === 'GOOGLE_DRIVE_AUTH_SUCCESS') {
+          const { tokens, folderId } = event.data;
+          await onUpdate({
+            ...settings,
+            googleDriveBackup: {
+              enabled: true,
+              tokens,
+              folderId: folderId || settings.googleDriveBackup?.folderId,
+              lastBackupDate: settings.googleDriveBackup?.lastBackupDate || null
+            }
+          });
+          window.removeEventListener('message', handleMessage);
+          alert("Google Drive connected successfully! Folder 'K83_Backups' created/linked.");
+        }
+      };
+      window.addEventListener('message', handleMessage);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to connect to Google Drive");
     }
-    setIsSaving(false);
+  };
+
+  const toggleDriveBackup = async (enabled: boolean) => {
+    await onUpdate({
+      ...settings,
+      googleDriveBackup: {
+        ...(settings.googleDriveBackup || { enabled: false }),
+        enabled
+      }
+    });
   };
 
   const handleAddRange = () => {
     if (!newRange.startDate || !newRange.endDate || !newRange.rate) return;
-    setRateHistory(prev => [...prev, {
-      startDate: newRange.startDate,
-      endDate: newRange.endDate,
-      rate: Number(newRange.rate)
-    }].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
+    
+    if (editingIndex !== null) {
+      setRateHistory(prev => {
+        const updated = [...prev];
+        updated[editingIndex] = {
+          startDate: newRange.startDate,
+          endDate: newRange.endDate,
+          rate: Number(newRange.rate)
+        };
+        return updated.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+      });
+      setEditingIndex(null);
+    } else {
+      setRateHistory(prev => [...prev, {
+        startDate: newRange.startDate,
+        endDate: newRange.endDate,
+        rate: Number(newRange.rate)
+      }].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
+    }
+    setNewRange({ startDate: '', endDate: '', rate: '' });
+  };
+
+  const handleEditRange = (index: number) => {
+    const range = rateHistory[index];
+    setNewRange({
+      startDate: range.startDate,
+      endDate: range.endDate,
+      rate: range.rate.toString()
+    });
+    setEditingIndex(index);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
     setNewRange({ startDate: '', endDate: '', rate: '' });
   };
 
@@ -83,7 +252,6 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
   };
 
   const handleRecalculate = async () => {
-    setShowRecalculateConfirm(false);
     setIsRecalculating(true);
     // Pass the current state values directly to ensure the latest ranges are used
     await recalculateAllEntryCosts({ 
@@ -120,7 +288,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
 
     try {
       const text = await file.text();
-      const backup: AppBackup = JSON.parse(text);
+      let backup: AppBackup = JSON.parse(text);
       
       if (!backup.version || !backup.settings || !Array.isArray(backup.entries)) {
         alert("Invalid backup file format.");
@@ -129,6 +297,23 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
 
       const confirmRestore = window.confirm("WARNING: Restoring a backup will wipe all current data and replace it with the backup content. This cannot be undone. Proceed?");
       if (!confirmRestore) return;
+
+      // Optimization: Preserve the current Drive tokens even if the backup has old ones
+      if (settings.googleDriveBackup?.tokens) {
+        backup = {
+          ...backup,
+          settings: {
+            ...backup.settings,
+            googleDriveBackup: {
+              ...(backup.settings.googleDriveBackup || { enabled: false }),
+              enabled: settings.googleDriveBackup.enabled,
+              tokens: settings.googleDriveBackup.tokens,
+              folderId: settings.googleDriveBackup.folderId,
+              lastBackupDate: settings.googleDriveBackup.lastBackupDate
+            }
+          }
+        };
+      }
 
       setRestoreProgress({ current: 0, total: 0, active: true, phase: null });
       
@@ -146,76 +331,91 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-      <div className="mb-10">
-        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">System Configuration</h2>
-        <p className="text-sm text-slate-500">Maintain constant parameters for the calculation engine</p>
+      <div className="mb-10 flex justify-between items-end">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">System Configuration</h2>
+          <p className="text-sm text-slate-500">Maintain constant parameters for the calculation engine</p>
+        </div>
+        <div className="text-right">
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">App Version</span>
+          <p className="text-xs font-mono font-bold text-indigo-600">v1.4.0-stable</p>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-8">
+      <div className="grid grid-cols-1 gap-8">
+        {/* General Settings Section */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit flex flex-col">
+          <div className="p-6 border-b border-slate-100 bg-indigo-50/10 flex items-center">
+            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+              <SettingsIcon size={18} className="text-indigo-600 transition-all" />
+              General Settings
+            </h3>
+          </div>
+          <div className="p-8">
+            <p className="text-xs text-slate-500 italic">Adjust your operational parameters below. Billing history and rates can be synchronized using the specific buttons in the Billing section.</p>
+          </div>
+        </div>
+
+        {/* Billing History Section */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit flex flex-col">
           <div className="p-6 border-b border-slate-100 bg-indigo-50/10 flex items-center justify-between">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
               <Calendar size={18} className="text-indigo-600" />
-              Operational Config & Billing History
+              Billing Ranges & History
             </h3>
-            <button
-              type="button"
-              onClick={handleRecalculate}
-              disabled={isRecalculating}
-              className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-indigo-600 hover:bg-white px-3 py-2 rounded-lg transition-all border border-indigo-100 shadow-sm"
-            >
-              <RefreshCw size={14} className={isRecalculating ? "animate-spin" : ""} />
-              Apply Rates to Ledger
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdate({ ...settings, rateHistory });
+                  alert("Billing history updated successfully.");
+                }}
+                className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-3 py-2 rounded-lg transition-all border border-emerald-100"
+              >
+                Sync Ranges
+              </button>
+              <button
+                type="button"
+                onClick={handleRecalculate}
+                disabled={isRecalculating}
+                className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-indigo-600 hover:bg-white px-3 py-2 rounded-lg transition-all border border-indigo-100 shadow-sm"
+              >
+                <RefreshCw size={14} className={isRecalculating ? "animate-spin" : ""} />
+                Apply Rates to Ledger
+              </button>
+            </div>
           </div>
           
           <div className="px-6 py-4 bg-slate-50 border-b border-slate-100">
             <p className="text-[10px] text-slate-500 leading-relaxed italic">
-              <strong>Workflow:</strong> 1. Define your <strong>Currency</strong> and <strong>Fallback Rate</strong>. 2. Add specific date ranges when you receive your monthly bill. 3. <strong>Save Changes</strong>. 4. Click <strong>Apply Rates to Ledger</strong> to recalculate profit history.
+              <strong>Workflow:</strong> 1. Add specific date ranges when you receive your monthly bill. 2. Click <strong>Sync Ranges</strong> to store the list. 3. Click <strong>Apply Rates to Ledger</strong> to recalculate profit history.
             </p>
           </div>
           
           <div className="p-8 space-y-10">
-            {/* Core Params Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-10 border-b border-slate-100">
-              <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest">
-                  Ledger Currency (ISO)
-                </label>
-                <input
-                  type="text"
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  maxLength={3}
-                  placeholder="PHP"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold uppercase text-lg"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-widest">
-                  Fallback P/kWh (Default)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={kwhRate}
-                  onChange={(e) => setKwhRate(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-mono font-bold text-lg"
-                />
-              </div>
-            </div>
-
             {/* Rate Adding Section */}
             <div className="space-y-4">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Add Billing Range</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+              <div className="flex justify-between items-center">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  {editingIndex !== null ? 'Update Billing Range' : 'Add Billing Range'}
+                </h4>
+                {editingIndex !== null && (
+                  <button 
+                    onClick={cancelEdit}
+                    className="text-[10px] font-bold text-red-500 uppercase flex items-center gap-1"
+                  >
+                    <X size={12} /> Cancel Edit
+                  </button>
+                )}
+              </div>
+              <div className={`grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-slate-50 rounded-xl border border-dashed ${editingIndex !== null ? 'border-indigo-500 bg-indigo-50/20' : 'border-slate-300'}`}>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Start Date</label>
                   <input 
                     type="date" 
                     value={newRange.startDate} 
                     onChange={e => setNewRange(prev => ({ ...prev, startDate: e.target.value }))}
-                    className="w-full bg-white border border-slate-200 rounded p-2 text-sm font-mono"
+                    className="w-full bg-white border border-slate-200 rounded p-2 text-sm font-mono text-slate-800"
                   />
                 </div>
                 <div className="space-y-1">
@@ -224,7 +424,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                     type="date" 
                     value={newRange.endDate} 
                     onChange={e => setNewRange(prev => ({ ...prev, endDate: e.target.value }))}
-                    className="w-full bg-white border border-slate-200 rounded p-2 text-sm font-mono"
+                    className="w-full bg-white border border-slate-200 rounded p-2 text-sm font-mono text-slate-800"
                   />
                 </div>
                 <div className="space-y-1">
@@ -236,7 +436,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                       value={newRange.rate} 
                       onChange={e => setNewRange(prev => ({ ...prev, rate: e.target.value }))}
                       placeholder="e.g. 14.19"
-                      className="w-full bg-white border border-slate-200 rounded p-2 text-sm font-mono"
+                      className="w-full bg-white border border-slate-200 rounded p-2 text-sm font-mono text-slate-800"
                     />
                     <button 
                       onClick={handleAddRange}
@@ -272,13 +472,24 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                           <span className="block text-[10px] font-bold text-slate-400 uppercase">Applied Rate</span>
                           <span className="text-sm font-mono font-black text-indigo-600">{Number(range.rate || 0).toFixed(4)}</span>
                         </div>
-                        <button 
-                          onClick={() => handleRemoveRange(idx)}
-                          type="button"
-                          className="text-slate-300 hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => handleEditRange(idx)}
+                            type="button"
+                            className="text-slate-300 hover:text-indigo-500 transition-colors"
+                            title="Edit range"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleRemoveRange(idx)}
+                            type="button"
+                            className="text-slate-300 hover:text-red-500 transition-colors"
+                            title="Remove range"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -286,23 +497,147 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
               </div>
             </div>
           </div>
-
-          <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-8 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg shadow-md transition-all flex items-center gap-3 disabled:opacity-50 text-xs uppercase tracking-widest"
-            >
-              <Save size={18} />
-              {isSaving ? 'Synchronizing...' : 'Save All Changes'}
-            </button>
-          </div>
         </div>
-      </form>
+      </div>
 
       <div className="mt-12 space-y-8">
-        {/* Backup & Recovery */}
-        {/* Backup & Recovery */}
+        {/* Google Drive Auto-Backup */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit mt-8">
+          <div className="p-6 border-b border-slate-100 bg-indigo-50/10 flex items-center gap-2">
+            <UploadCloud size={18} className="text-indigo-600" />
+            <h3 className="font-bold text-slate-800 uppercase tracking-widest text-[10px]">
+              Google Drive Auto-Backup
+            </h3>
+          </div>
+          <div className="p-8">
+            <div className="flex flex-col md:flex-row gap-8 items-start">
+              <div className="flex-1 space-y-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-bold text-slate-800 tracking-tight">Cloud Data Protection</span>
+                  <p className="text-[10px] text-slate-500 leading-relaxed">
+                    Automatically upload a secure JSON backup to your Google Drive every day when you access the system.
+                  </p>
+                </div>
+
+                {!settings.googleDriveBackup?.tokens ? (
+                  <button
+                    type="button"
+                    onClick={handleConnectDrive}
+                    className="w-fit px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-md hover:bg-slate-900"
+                  >
+                    <LinkIcon size={16} />
+                    Connect Google Drive
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg w-fit border border-emerald-100">
+                      <CheckCircle2 size={16} />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Drive Connected</span>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleDriveBackup(!settings.googleDriveBackup?.enabled)}
+                        className={`px-6 py-2.5 font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-sm border-2 ${settings.googleDriveBackup?.enabled ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+                      >
+                        {settings.googleDriveBackup?.enabled ? 'Auto-Backup: Enabled' : 'Auto-Backup: Disabled'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleManualCloudBackup}
+                        disabled={isUploadingToDrive}
+                        className="px-6 py-2.5 bg-white border-2 border-slate-200 text-slate-600 font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 disabled:opacity-50"
+                      >
+                        <UploadCloud size={16} className={isUploadingToDrive ? 'animate-bounce' : ''} />
+                        {isUploadingToDrive ? 'Uploading...' : 'Backup Now'}
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={handleConnectDrive}
+                        className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 underline underline-offset-4 ml-auto"
+                      >
+                        Reconnect Account
+                      </button>
+                    </div>
+
+                    <div className="mt-8 pt-8 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <HistoryIcon size={16} className="text-slate-400" />
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cloud Recovery Points</h4>
+                        </div>
+                        <button 
+                          onClick={fetchDriveBackups}
+                          disabled={isLoadingDriveFiles}
+                          className="text-[9px] font-bold uppercase tracking-widest text-indigo-600 flex items-center gap-1 hover:underline disabled:opacity-50"
+                        >
+                          <RefreshCw size={12} className={isLoadingDriveFiles ? 'animate-spin' : ''} />
+                          Check Drive
+                        </button>
+                      </div>
+
+                      {driveFiles.length > 0 ? (
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                          {driveFiles.map((file) => (
+                            <div key={file.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 hover:border-indigo-200 transition-colors group">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-slate-700">{file.name}</span>
+                                <span className="text-[9px] text-slate-400 font-mono">
+                                  {new Date(file.createdTime).toLocaleString()} • {(file.size / 1024).toFixed(1)} KB
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => handleRestoreFromDrive(file.id)}
+                                className="px-3 py-1 bg-white border border-slate-200 rounded-md text-[9px] font-bold uppercase tracking-widest text-indigo-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all opacity-0 group-hover:opacity-100 shadow-sm"
+                              >
+                                Restore
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center text-[10px] text-slate-400 italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                          {isLoadingDriveFiles ? (
+                            <div className="flex flex-col items-center gap-2">
+                              <RefreshCw size={16} className="animate-spin text-indigo-400" />
+                              <span>Accessing Drive...</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-2">
+                              <HardDrive size={16} className="text-slate-300" />
+                              <span>No recent cloud backups found. Click "Check Drive" to scan.</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+                {settings.googleDriveBackup?.lastBackupDate && (
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 w-full md:w-fit min-w-[200px]">
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Last Cloud Sync</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xl font-black text-slate-800">{settings.googleDriveBackup.lastBackupDate}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 italic">Backup verified in Drive Folder</p>
+                    {settings.googleDriveBackup.folderId && (
+                      <div className="mt-3 pt-3 border-t border-slate-200 flex items-center gap-2">
+                        <HardDrive size={12} className="text-slate-400" />
+                        <span className="text-[9px] font-mono text-slate-400 uppercase">Remote ID: {settings.googleDriveBackup.folderId.slice(0, 8)}...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
+
+        {/* Local Backup & Recovery */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit mt-8">
           <div className="p-6 border-b border-slate-100 bg-indigo-50/10 flex items-center gap-2">
             <Database size={18} className="text-indigo-600" />
@@ -381,130 +716,103 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
           )}
         </div>
 
-        <div className="bg-red-50/50 rounded-xl border border-red-100 overflow-hidden mt-8">
-          <div className="p-6 border-b border-red-100 bg-red-50/30 flex items-center justify-between">
-            <h3 className="font-bold text-red-800 flex items-center gap-2 uppercase tracking-widest text-xs">
-              <AlertTriangle size={18} className="text-red-600" />
-              Danger Zone
-            </h3>
-          </div>
-          <div className="p-8">
-            <div className="max-w-2xl">
-              <div className="flex flex-col gap-2 mb-6">
-                <span className="text-sm font-bold text-slate-800">Complete Database Reset</span>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  This will permanently wipe <strong>all operational history</strong> and <strong>business expenses</strong>. 
-                  This action is intended for a full system reset and cannot be undone.
-                </p>
-              </div>
+        {!window.location.href.includes('https://mitomi24.github.io/K83-CyberCafe/') && (
+          <div className="bg-red-50/50 rounded-xl border border-red-100 overflow-hidden mt-8">
+            <div className="p-6 border-b border-red-100 bg-red-50/30 flex items-center justify-between">
+              <h3 className="font-bold text-red-800 flex items-center gap-2 uppercase tracking-widest text-xs">
+                <AlertTriangle size={18} className="text-red-600" />
+                Danger Zone
+              </h3>
+            </div>
+            <div className="p-8">
+              <div className="max-w-2xl">
+                <div className="flex flex-col gap-2 mb-6">
+                  <span className="text-sm font-bold text-slate-800">Complete Database Reset</span>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    This will permanently wipe <strong>all operational history</strong> and <strong>business expenses</strong>. 
+                    This action is intended for a full system reset and cannot be undone.
+                  </p>
+                </div>
 
-              <div className="flex flex-col gap-4">
-                {!isConfirmingWipe ? (
-                  <button
-                    type="button"
-                    disabled={deletionProgress.active}
-                    onClick={() => setIsConfirmingWipe(true)}
-                    className="w-fit px-8 py-3 bg-white border-2 border-red-200 text-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 font-bold rounded-xl transition-all flex items-center gap-3 text-xs uppercase tracking-widest disabled:opacity-50 shadow-sm"
-                  >
-                    <Trash2 size={18} />
-                    Reset System Data
-                  </button>
-                ) : (
-                  <div className="p-6 bg-white border-2 border-red-200 rounded-xl space-y-4 shadow-lg animate-in slide-in-from-bottom-2 duration-300">
-                    <div className="flex items-start gap-3 text-red-600">
-                      <AlertTriangle size={20} className="shrink-0" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-black uppercase tracking-tight">Destructive Action Required</p>
-                        <p className="text-xs text-slate-600 leading-relaxed">
-                          To confirm permanent deletion of ALL records, please type <span className="font-mono font-bold text-red-600 tracking-widest">DELETE ALL</span> below. This cannot be undone.
-                        </p>
+                <div className="flex flex-col gap-4">
+                  {!isConfirmingWipe ? (
+                    <button
+                      type="button"
+                      disabled={deletionProgress.active}
+                      onClick={() => setIsConfirmingWipe(true)}
+                      className="w-fit px-8 py-3 bg-white border-2 border-red-200 text-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 font-bold rounded-xl transition-all flex items-center gap-3 text-xs uppercase tracking-widest disabled:opacity-50 shadow-sm"
+                    >
+                      <Trash2 size={18} />
+                      Reset System Data
+                    </button>
+                  ) : (
+                    <div className="p-6 bg-white border-2 border-red-200 rounded-xl space-y-4 shadow-lg animate-in slide-in-from-bottom-2 duration-300">
+                      <div className="flex items-start gap-3 text-red-600">
+                        <AlertTriangle size={20} className="shrink-0" />
+                        <div className="space-y-1">
+                          <p className="text-sm font-black uppercase tracking-tight">Destructive Action Required</p>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            To confirm permanent deletion of ALL records, please type <span className="font-mono font-bold text-red-600 tracking-widest">DELETE ALL</span> below. This cannot be undone.
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <input
+                          type="text"
+                          value={wipeConfirmText}
+                          onChange={(e) => setWipeConfirmText(e.target.value)}
+                          placeholder="Type DELETE ALL"
+                          className="flex-1 px-4 py-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-sm font-mono font-bold focus:border-red-500 outline-none transition-all uppercase"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleSystemWipe}
+                            disabled={wipeConfirmText !== 'DELETE ALL'}
+                            className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg text-xs uppercase tracking-widest disabled:opacity-50 hover:bg-red-700 transition-all shadow-md"
+                          >
+                            Confirm Wipe
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsConfirmingWipe(false);
+                              setWipeConfirmText('');
+                            }}
+                            className="px-6 py-2 bg-slate-100 text-slate-600 font-bold rounded-lg text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <input
-                        type="text"
-                        value={wipeConfirmText}
-                        onChange={(e) => setWipeConfirmText(e.target.value)}
-                        placeholder="Type DELETE ALL"
-                        className="flex-1 px-4 py-2 bg-slate-50 border-2 border-slate-200 rounded-lg text-sm font-mono font-bold focus:border-red-500 outline-none transition-all uppercase"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={handleSystemWipe}
-                          disabled={wipeConfirmText !== 'DELETE ALL'}
-                          className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg text-xs uppercase tracking-widest disabled:opacity-50 hover:bg-red-700 transition-all shadow-md"
-                        >
-                          Confirm Wipe
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsConfirmingWipe(false);
-                            setWipeConfirmText('');
-                          }}
-                          className="px-6 py-2 bg-slate-100 text-slate-600 font-bold rounded-lg text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
-                        >
-                          Cancel
-                        </button>
+                  )}
+
+                  {deletionProgress.active && (
+                    <div className="space-y-2 p-4 bg-white rounded-xl border border-red-100 shadow-sm">
+                      <div className="flex justify-between items-end">
+                        <span className="text-[10px] font-bold text-red-600 uppercase tracking-tighter">
+                          Wiping Database ({deletionProgress.phase === 'entries' ? 'Operations' : 'Expenses'}): {deletionProgress.current}/{deletionProgress.total}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {Math.round((deletionProgress.current / (deletionProgress.total || 1)) * 100)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-red-100 rounded-full h-2 overflow-hidden shadow-inner">
+                        <div 
+                          className="bg-red-600 h-full transition-all duration-500 ease-out" 
+                          style={{ width: `${Math.min(100, (deletionProgress.current / (deletionProgress.total || 1)) * 100)}%` }}
+                        />
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {deletionProgress.active && (
-                  <div className="space-y-2 p-4 bg-white rounded-xl border border-red-100 shadow-sm">
-                    <div className="flex justify-between items-end">
-                      <span className="text-[10px] font-bold text-red-600 uppercase tracking-tighter">
-                        Wiping Database ({deletionProgress.phase === 'entries' ? 'Operations' : 'Expenses'}): {deletionProgress.current}/{deletionProgress.total}
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        {Math.round((deletionProgress.current / (deletionProgress.total || 1)) * 100)}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-red-100 rounded-full h-2 overflow-hidden shadow-inner">
-                      <div 
-                        className="bg-red-600 h-full transition-all duration-500 ease-out" 
-                        style={{ width: `${Math.min(100, (deletionProgress.current / (deletionProgress.total || 1)) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
-      {showRecalculateConfirm && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-slate-100 bg-indigo-50/30 flex items-center gap-3">
-              <RefreshCw className="text-indigo-600" size={24} />
-              <h3 className="font-bold text-slate-800 text-lg">Recalculate Ledger?</h3>
-            </div>
-            <div className="p-8 space-y-4">
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Settings saved. Would you like to scan and recalculate your <strong>Profit history</strong> based on the updated billing history ranges?
-              </p>
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={handleRecalculate}
-                  className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md active:scale-95"
-                >
-                  Recalculate Profits Now
-                </button>
-                <button
-                  onClick={() => setShowRecalculateConfirm(false)}
-                  className="w-full py-3 bg-slate-100 text-slate-600 font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
-                >
-                  Skip for Now
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

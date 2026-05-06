@@ -37,6 +37,18 @@ If you see this error when logging in:
 2. Navigate to **Authentication** > **Settings** > **Authorized Domains**.
 3. Add your deployment domain (e.g., `yourusername.github.io`) and `localhost` to the list.
 
+### Google Drive Backup Setup
+This app supports automatic daily backups to your Google Drive. To enable this:
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project and enable the **Google Drive API**.
+3. Configure the **OAuth Consent Screen** (internal or external).
+4. Create **OAuth 2.0 Client IDs** (Web Application).
+5. Add these **Authorized redirect URIs**:
+   - `https://ais-dev-urxqrgy7m6bn56pdv4nkiu-895055720664.asia-southeast1.run.app/api/auth/google/callback`
+   - `https://ais-pre-urxqrgy7m6bn56pdv4nkiu-895055720664.asia-southeast1.run.app/api/auth/google/callback`
+6. Set the `VITE_GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in your app's Settings > Secrets.
+7. Go to the app's **Settings** and click **Connect Google Drive**.
+
 ## 🛠 Features
 - **Dual System**: Switch between Cybercafe (Energy tracking) and Printing (Job tracking) modes.
 - **Analytics**: Peak daily/weekly/monthly stats with specific dates and customer counts.
