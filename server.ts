@@ -17,34 +17,65 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
 
   // Google OAuth Configuration
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.VITE_GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    `${process.env.APP_URL || 'http://localhost:3000'}/api/auth/google/callback`
-  );
+  const getOAuthClient = () => {
+    const clientId = process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const redirectUri = `${appUrl.replace(/\/$/, '')}/api/auth/google/callback`;
+
+    if (!clientId || !clientSecret) {
+      console.error("CRITICAL: Google OAuth credentials missing from environment.");
+      return null;
+    }
+
+    console.log(`Setting up OAuth with Client ID: ${clientId.substring(0, 5)}... and Redirect URI: ${redirectUri}`);
+    
+    return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  };
+
+  const oauth2Client = getOAuthClient();
 
   // API Routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+    res.json({ 
+      status: "ok", 
+      config: {
+        hasClientId: !!(process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID),
+        hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+        appUrl: process.env.APP_URL || 'not set'
+      }
+    });
   });
 
   // 1. Get Google Auth URL
   app.get("/api/auth/google/url", (req, res) => {
-    const scopes = [
-      'https://www.googleapis.com/auth/drive.file',
-      'https://www.googleapis.com/auth/userinfo.profile',
-      'https://www.googleapis.com/auth/userinfo.email',
-      'openid'
-    ];
+    try {
+      if (!oauth2Client) {
+        console.error("Cannot generate Auth URL: OAuth client not initialized (missing credentials)");
+        return res.status(500).json({ 
+          error: "Google Drive is not configured on the server. Please add VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to Secrets." 
+        });
+      }
 
-    const url = oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: scopes,
-      prompt: 'consent', // Force consent to ensure refresh token is returned
-      state: req.query.uid as string // Pass Firebase UID in state to link accounts
-    });
+      const scopes = [
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'https://www.googleapis.com/auth/userinfo.email',
+        'openid'
+      ];
 
-    res.json({ url });
+      const url = oauth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: scopes,
+        prompt: 'consent', // Force consent to ensure refresh token is returned
+        state: req.query.uid as string // Pass Firebase UID in state to link accounts
+      });
+
+      res.json({ url });
+    } catch (error) {
+      console.error("Error generating Auth URL:", error);
+      res.status(500).json({ error: "Failed to generate authentication URL." });
+    }
   });
 
   // 2. Google OAuth Callback

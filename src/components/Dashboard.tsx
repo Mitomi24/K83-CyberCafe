@@ -288,8 +288,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
   // Cloud connection helper
   const handleConnectDrive = async () => {
     try {
-      const response = await fetch('/api/auth/google/url');
-      const { url } = await response.json();
+      const response = await fetch(`/api/auth/google/url${user ? `?uid=${user.uid}` : ''}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to get connection URL");
+      }
+
+      const { url } = data;
       
       const width = 600;
       const height = 700;
@@ -328,9 +334,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
       };
 
       window.addEventListener('message', handleMessage);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Connect Drive error:", error);
-      alert("Failed to start Google Drive connection.");
+      alert(error.message || "Failed to start Google Drive connection.");
     }
   };
 
