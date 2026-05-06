@@ -42,7 +42,7 @@ export const PrintingForm: React.FC<PrintingFormProps> = ({ onAdd, onUpdate, edi
       setPlatform(editingEntry.platform as any || 'messenger');
       setFileLink(editingEntry.fileLink || '');
       setRemarks(editingEntry.remarks || '');
-      setCustomDate(format(editingEntry.date.toDate(), 'yyyy-MM-dd'));
+      setCustomDate(format(editingEntry.date.toDate(), "yyyy-MM-dd'T'HH:mm"));
       setLoggedBy(editingEntry.loggedBy as any || 'Gen');
     } else {
       setIncome('');
@@ -50,7 +50,7 @@ export const PrintingForm: React.FC<PrintingFormProps> = ({ onAdd, onUpdate, edi
       setPlatform('messenger');
       setFileLink('');
       setRemarks('');
-      setCustomDate('');
+      setCustomDate(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
       setLoggedBy('Gen');
     }
   }, [editingEntry]);
@@ -216,11 +216,11 @@ export const PrintingForm: React.FC<PrintingFormProps> = ({ onAdd, onUpdate, edi
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Backdate (Optional)</label>
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Date & Time</label>
           <div className="relative">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
-              type="date"
+              type="datetime-local"
               value={customDate}
               onChange={(e) => setCustomDate(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition-all"

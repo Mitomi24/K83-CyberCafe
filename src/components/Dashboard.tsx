@@ -214,7 +214,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
     }
 
     const entrySheetData = exportEntries.map(e => ({
-      Date: format(e.date.toDate(), 'yyyy-MM-dd'),
+      Date: category === 'printing' 
+        ? format(e.date.toDate(), 'yyyy-MM-dd HH:mm')
+        : format(e.date.toDate(), 'yyyy-MM-dd'),
       Income: e.grossIncome,
       Category: e.category || 'cybercafe',
       'Logged By': e.loggedBy || 'Unknown',
@@ -554,7 +556,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
                               className="text-sm border-l-2 border-transparent hover:border-indigo-500 hover:bg-slate-50/50 transition-all"
                             >
                               <td className="px-6 py-4 font-bold text-slate-700">
-                                {format(entry.date.toDate(), 'MMM dd, yyyy')}
+                                {category === 'printing' 
+                                  ? format(entry.date.toDate(), 'MMM dd, yyyy, hh:mm a')
+                                  : format(entry.date.toDate(), 'MMM dd, yyyy')}
                               </td>
                               <td className="px-6 py-4">
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${entry.loggedBy === 'Tom' ? 'bg-blue-100 text-blue-700' : entry.loggedBy === 'Gen' ? 'bg-pink-100 text-pink-700' : 'bg-slate-100 text-slate-500'}`}>
