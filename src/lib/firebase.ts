@@ -2,8 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { 
   initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager,
+  memoryLocalCache,
   doc, 
   getDocFromServer 
 } from 'firebase/firestore';
@@ -11,10 +10,11 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with settings for better reliability in potentially restricted environments
+// Initialize Firestore with settings for better reliability in restricted environments
+// Using memoryLocalCache temporarily to rule out IndexDB issues in the iframe
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-  experimentalForceLongPolling: true, // Use long-polling as a fallback for environments that might block WebSockets
+  localCache: memoryLocalCache(),
+  experimentalForceLongPolling: true,
 }, firebaseConfig.firestoreDatabaseId);
 
 export const auth = getAuth(app);
