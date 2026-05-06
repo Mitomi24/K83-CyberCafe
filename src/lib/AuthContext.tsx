@@ -4,11 +4,12 @@ import {
   onAuthStateChanged, 
   signInWithPopup, 
   GoogleAuthProvider, 
-  signOut 
+  signOut
 } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { UserSettings } from '../types';
+import { APP_VERSION } from '../version';
 
 interface AuthContextType {
   user: User | null;
@@ -26,43 +27,74 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Handle version-based logout
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const storedVersion = localStorage.getItem('k83_app_version');
+    
+    if (storedVersion && storedVersion !== APP_VERSION) {
+      console.log(`Version mismatch: ${storedVersion} vs ${APP_VERSION}. Forcing logout.`);
+      signOut(auth).then(() => {
+        localStorage.setItem('k83_app_version', APP_VERSION);
+        // Optional: reload to ensure clinical state
+        window.location.reload();
+      });
+    } else {
+      localStorage.setItem('k83_app_version', APP_VERSION);
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      if (currentUser) {
-        try {
-          // Fetch user settings
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-          if (userDoc.exists()) {
-            setSettings(userDoc.data() as UserSettings);
-          } else {
-            // Default settings
-            const defaultSettings: UserSettings = { kwhRate: 12, currency: 'Php', theme: 'light' };
-            await setDoc(doc(db, 'users', currentUser.uid), defaultSettings);
-            setSettings(defaultSettings);
-          }
-        } catch (error) {
-          console.error("Failed to fetch user settings:", error);
-          // Fallback to minimal settings if fetch fails
-          if (!settings) {
-            setSettings({ kwhRate: 12, currency: 'Php' });
-          }
-        }
-      } else {
+      if (!currentUser) {
         setSettings(null);
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const userDocRef = doc(db, 'users', user.uid);
+    
+    // Use onSnapshot to keep settings in sync across devices
+    const unsubscribeSettings = onSnapshot(userDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setSettings(snapshot.data() as UserSettings);
+      } else {
+        // Initial setup for new user
+        const defaultSettings: UserSettings = { kwhRate: 12, currency: 'Php', theme: 'light' };
+        setDoc(userDocRef, defaultSettings).catch(err => {
+          console.error("Initial settings setup failed:", err);
+        });
+        setSettings(defaultSettings);
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Settings listener error:", error);
+      // Fallback if settings can't be fetched
+      if (!settings) {
+        setSettings({ kwhRate: 12, currency: 'Php' });
       }
       setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => unsubscribeSettings();
+  }, [user]);
 
   const signIn = async () => {
-    const provider = new GoogleAuthProvider();
     try {
+      const provider = new GoogleAuthProvider();
+      // Add scopes if we want to try getting access token, but Firebase doesn't return refresh tokens
+      // provider.addScope('https://www.googleapis.com/auth/drive.file');
+      
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
+      alert(error.message || "Login failed. Please try again.");
     }
   };
 

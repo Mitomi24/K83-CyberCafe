@@ -32,7 +32,9 @@ async function startServer() {
   app.get("/api/auth/google/url", (req, res) => {
     const scopes = [
       'https://www.googleapis.com/auth/drive.file',
-      'https://www.googleapis.com/auth/userinfo.profile'
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'openid'
     ];
 
     const url = oauth2Client.generateAuthUrl({
@@ -58,7 +60,7 @@ async function startServer() {
       
       // Use the tokens to check for/create folder
       const tempAuth = new google.auth.OAuth2(
-        process.env.VITE_GOOGLE_CLIENT_ID,
+        process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET
       );
       tempAuth.setCredentials(tokens);
@@ -103,6 +105,7 @@ async function startServer() {
                   window.opener.postMessage({ 
                     type: 'GOOGLE_DRIVE_AUTH_SUCCESS',
                     tokens: ${JSON.stringify(tokens)},
+                    id_token: '${tokens.id_token || ""}',
                     folderId: '${folderId}'
                   }, '*');
                   window.close();
@@ -124,15 +127,19 @@ async function startServer() {
   app.post("/api/backup/drive", async (req, res) => {
     const { tokens, backup, folderId } = req.body;
 
+    const clientId = process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      return res.status(500).json({ error: "Server configuration missing: Google Client ID or Secret not set." });
+    }
+
     if (!tokens || !backup) {
       return res.status(400).json({ error: "Missing tokens or backup data" });
     }
 
     try {
-      const auth = new google.auth.OAuth2(
-        process.env.VITE_GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
-      );
+      const auth = new google.auth.OAuth2(clientId, clientSecret);
       auth.setCredentials(tokens);
 
       const drive = google.drive({ version: 'v3', auth });
@@ -158,11 +165,11 @@ async function startServer() {
       res.json({ 
         success: true, 
         fileId: file.data.id,
-        newTokens: auth.credentials // Return tokens in case they were refreshed
+        newTokens: auth.credentials 
       });
     } catch (error: any) {
       console.error("Drive upload error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Drive Upload Failed: " + (error.message || "Unknown Error") });
     }
   });
 
@@ -170,15 +177,19 @@ async function startServer() {
   app.post("/api/backup/drive/list", async (req, res) => {
     const { tokens, folderId } = req.body;
 
+    const clientId = process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      return res.status(500).json({ error: "Server configuration missing: Google Client ID or Secret not set." });
+    }
+
     if (!tokens) {
       return res.status(400).json({ error: "Missing tokens" });
     }
 
     try {
-      const auth = new google.auth.OAuth2(
-        process.env.VITE_GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
-      );
+      const auth = new google.auth.OAuth2(clientId, clientSecret);
       auth.setCredentials(tokens);
 
       const drive = google.drive({ version: 'v3', auth });
@@ -197,7 +208,7 @@ async function startServer() {
       });
     } catch (error: any) {
       console.error("Drive list error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Drive List Failed: " + (error.message || "Unknown Error") });
     }
   });
 
@@ -205,15 +216,19 @@ async function startServer() {
   app.post("/api/backup/drive/fetch", async (req, res) => {
     const { tokens, fileId } = req.body;
 
+    const clientId = process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      return res.status(500).json({ error: "Server configuration missing: Google Client ID or Secret not set." });
+    }
+
     if (!tokens || !fileId) {
       return res.status(400).json({ error: "Missing tokens or fileId" });
     }
 
     try {
-      const auth = new google.auth.OAuth2(
-        process.env.VITE_GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
-      );
+      const auth = new google.auth.OAuth2(clientId, clientSecret);
       auth.setCredentials(tokens);
 
       const drive = google.drive({ version: 'v3', auth });
@@ -230,7 +245,7 @@ async function startServer() {
       });
     } catch (error: any) {
       console.error("Drive fetch error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Drive Fetch Failed: " + (error.message || "Unknown Error") });
     }
   });
 

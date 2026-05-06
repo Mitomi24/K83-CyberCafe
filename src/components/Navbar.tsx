@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { LogOut, LayoutDashboard, Settings as SettingsIcon, PlusCircle, ReceiptText, DollarSign, Monitor, Printer, FileText } from 'lucide-react';
+import { APP_VERSION } from '../version';
 
 interface NavbarProps {
   onNavigate: (view: 'cybercafe' | 'printing' | 'reports' | 'settings') => void;
@@ -40,8 +41,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activeView }) => {
                 K83 Management
               </h1>
               <div className="flex items-center gap-2">
-                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Enterprise Edition</span>
-                <span className="text-[8px] font-mono font-bold text-indigo-500/50">v1.4.0-stable</span>
+                <span className="text-[8px] font-mono font-bold text-indigo-500/50">v{APP_VERSION}</span>
               </div>
             </div>
           </div>

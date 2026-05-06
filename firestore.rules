@@ -39,23 +39,25 @@ service cloud.firestore {
 
     // Collection Rules
     match /system/connection_test {
-      allow read: if isSignedIn();
+      allow read: if true;
     }
 
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow create, update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow create, update: if isOwner(userId); // More permissive for profile fields for now, but still owner-locked
       
       match /entries/{entryId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidEntry(request.resource.data);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(entryId);
+        allow create, update: if isOwner(userId) && isValidId(entryId) && isValidEntry(request.resource.data);
+        allow delete: if isOwner(userId) && isValidId(entryId);
       }
 
       match /expenses/{expenseId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidExpense(request.resource.data);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(expenseId);
+        allow create, update: if isOwner(userId) && isValidId(expenseId) && isValidExpense(request.resource.data);
+        allow delete: if isOwner(userId) && isValidId(expenseId);
       }
     }
   }

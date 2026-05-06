@@ -5,10 +5,12 @@ import { EntryForm } from './EntryForm';
 import { useData } from '../lib/useData';
 import { useAuth } from '../lib/AuthContext';
 import { format } from 'date-fns';
-import { Trash2, History as HistoryIcon, Download, ChevronLeft, ChevronRight, ArrowUpDown, TrendingUp, Edit2 } from 'lucide-react';
+import { Trash2, History as HistoryIcon, Download, ChevronLeft, ChevronRight, ArrowUpDown, TrendingUp, Edit2, CloudOff, Link as LinkIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatCurrency, cn } from '../lib/utils';
 import * as XLSX from 'xlsx';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 import { PrintingForm } from './PrintingForm';
 import { Expenses } from './Expenses';
@@ -283,9 +285,83 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
     return addExpense(name, amount, date, quantity, unitPrice, category);
   };
 
+  // Cloud connection helper
+  const handleConnectDrive = async () => {
+    try {
+      const response = await fetch('/api/auth/google/url');
+      const { url } = await response.json();
+      
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.innerWidth - width) / 2;
+      const top = window.screenY + (window.innerHeight - height) / 2;
+      
+      const popup = window.open(
+        url, 
+        'google_auth', 
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      if (!popup) {
+        alert("Popup blocked! Please allow popups to connect Google Drive.");
+        return;
+      }
+
+      const handleMessage = async (event: MessageEvent) => {
+        if (event.data?.type === 'GOOGLE_DRIVE_AUTH_SUCCESS') {
+          const { tokens, folderId } = event.data;
+          
+          if (user) {
+            await setDoc(doc(db, 'users', user.uid), {
+              googleDriveBackup: {
+                enabled: true,
+                tokens,
+                folderId,
+                lastBackupDate: null
+              }
+            }, { merge: true });
+            
+            alert("Google Drive linked successfully!");
+          }
+          window.removeEventListener('message', handleMessage);
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+    } catch (error) {
+      console.error("Connect Drive error:", error);
+      alert("Failed to start Google Drive connection.");
+    }
+  };
+
   return (
-    <div className="max-w-none mx-auto py-6 px-4 sm:px-6 lg:px-12">
-      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="max-w-none mx-auto py-6 px-4 sm:px-6 lg:px-12 space-y-6">
+      <AnimatePresence mode="wait">
+        {(!settings.googleDriveBackup?.tokens || !settings.googleDriveBackup?.folderId) && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-indigo-600 rounded-xl p-4 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 border-2 border-indigo-400 group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center text-white backdrop-blur-md shrink-0">
+                <CloudOff size={20} />
+              </div>
+              <div className="text-center md:text-left">
+                <h4 className="text-white font-black text-xs uppercase tracking-widest leading-tight mb-1">Cloud Sync Incomplete</h4>
+                <p className="text-indigo-100 text-[10px] font-medium max-w-md">Access your operational records from any device by linking your Google account. This enables daily automated backups for safety.</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleConnectDrive}
+              className="bg-white text-indigo-600 px-6 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 whitespace-nowrap"
+            >
+              <LinkIcon size={14} /> Finish Cloud Setup
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <div className="mb-2 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase tracking-widest rounded-full">Administrator</span>

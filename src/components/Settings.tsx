@@ -3,6 +3,7 @@ import { UserSettings, AppBackup } from '../types';
 import { Settings as SettingsIcon, Info, Database, Trash2, AlertTriangle, Calendar, Plus, RefreshCw, Download, UploadCloud, Link as LinkIcon, CheckCircle2, CloudOff, HardDrive, Pencil, X, History as HistoryIcon } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useData } from '../lib/useData';
+import { APP_VERSION } from '../version';
 
 interface SettingsProps {
   settings: UserSettings;
@@ -52,15 +53,19 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
       await uploadToDrive();
       alert("Manual backup uploaded to Google Drive successfully.");
       await fetchDriveBackups(); // Refresh list
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Failed to upload manual backup to Drive.");
+      const errorMsg = e.message || "Failed to upload manual backup to Drive.";
+      alert(errorMsg);
     }
     setIsUploadingToDrive(false);
   };
 
   const fetchDriveBackups = async () => {
-    if (!settings.googleDriveBackup?.tokens || !settings.googleDriveBackup?.folderId) return;
+    if (!settings.googleDriveBackup?.tokens || !settings.googleDriveBackup?.folderId) {
+      alert("Google Drive is not connected or configured. Please connect your account first.");
+      return;
+    }
     
     setIsLoadingDriveFiles(true);
     try {
@@ -84,10 +89,12 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
             }
           });
         }
+      } else {
+        alert("Cloud check error: " + (data.error || "Unknown error"));
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to fetch cloud backups.");
+      alert("Network error: Failed to reach cloud backup service.");
     }
     setIsLoadingDriveFiles(false);
   };
@@ -338,7 +345,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
         </div>
         <div className="text-right">
           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">App Version</span>
-          <p className="text-xs font-mono font-bold text-indigo-600">v1.4.0-stable</p>
+          <p className="text-xs font-mono font-bold text-indigo-600">v{APP_VERSION}</p>
         </div>
       </div>
 
@@ -520,19 +527,24 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                 </div>
 
                 {!settings.googleDriveBackup?.tokens ? (
-                  <button
-                    type="button"
-                    onClick={handleConnectDrive}
-                    className="w-fit px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-md hover:bg-slate-900"
-                  >
-                    <LinkIcon size={16} />
-                    Connect Google Drive
-                  </button>
+                  <div className="space-y-4">
+                    <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-3 rounded-lg border border-amber-100 italic">
+                      Drive permissions were not granted during login. You must manually link your account to enable cloud backups.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleConnectDrive}
+                      className="w-fit px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-md hover:bg-slate-900"
+                    >
+                      <LinkIcon size={16} />
+                      Grant Drive Permissions
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg w-fit border border-emerald-100">
+                    <div className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg w-fit border border-indigo-100">
                       <CheckCircle2 size={16} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Drive Connected</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Linked to Account: {user?.email}</span>
                     </div>
                     
                     <div className="flex flex-wrap items-center gap-3">
@@ -551,7 +563,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                         className="px-6 py-2.5 bg-white border-2 border-slate-200 text-slate-600 font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 disabled:opacity-50"
                       >
                         <UploadCloud size={16} className={isUploadingToDrive ? 'animate-bounce' : ''} />
-                        {isUploadingToDrive ? 'Uploading...' : 'Backup Now'}
+                        {isUploadingToDrive ? 'Upload Backup Now' : 'Upload Backup Now'}
                       </button>
                       
                       <button
@@ -559,7 +571,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                         onClick={handleConnectDrive}
                         className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 underline underline-offset-4 ml-auto"
                       >
-                        Reconnect Account
+                        Sync New Permissions
                       </button>
                     </div>
 

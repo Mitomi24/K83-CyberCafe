@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
@@ -7,10 +7,15 @@ import { Expenses } from './components/Expenses';
 import { Login } from './components/Login';
 import { Reports } from './components/Reports';
 import { useData } from './lib/useData';
+import { APP_VERSION } from './version';
 
 const AppContent: React.FC = () => {
   const { user, loading, settings, updateSettings } = useAuth();
   const [activeView, setActiveView] = useState<'cybercafe' | 'printing' | 'reports' | 'settings'>('cybercafe');
+
+  useEffect(() => {
+    document.title = `K83 Management v${APP_VERSION}`;
+  }, []);
 
   if (loading) {
     return (
@@ -45,7 +50,7 @@ const AppContent: React.FC = () => {
           <div className="flex items-center justify-center gap-2 mb-4">
             <div className="w-6 h-6 bg-indigo-600 rounded flex items-center justify-center text-white text-[10px] font-bold">K83</div>
             <span className="font-bold text-slate-400">K83 Cyber Cafe</span>
-            <span className="text-[10px] font-mono text-slate-300 ml-2">v1.4.0-stable</span>
+            <span className="text-[10px] font-mono text-slate-300 ml-2">v{APP_VERSION}</span>
           </div>
           <p className="text-slate-400 text-[10px] tracking-widest uppercase font-bold">
             © {new Date().getFullYear()} K83 Operational Management System

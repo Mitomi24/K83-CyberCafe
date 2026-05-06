@@ -9,7 +9,11 @@ import {
   addDoc, 
   deleteDoc,
   updateDoc,
-  serverTimestamp 
+  serverTimestamp,
+  writeBatch,
+  getDocs,
+  limit,
+  setDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './AuthContext';
@@ -182,12 +186,11 @@ export function useData() {
 
   const clearAllEntries = async (onProgress?: (deleted: number, total: number) => void) => {
     if (!user) return;
-    const { writeBatch, getDocs, collection: fCollection, query: fQuery, limit: fLimit } = await import('firebase/firestore');
     const entryPath = `users/${user.uid}/entries`;
     
     try {
       // First, get the total count for progress reporting
-      const totalSnap = await getDocs(fCollection(db, entryPath));
+      const totalSnap = await getDocs(collection(db, entryPath));
       const total = totalSnap.size;
       if (total === 0) return;
 
@@ -195,7 +198,7 @@ export function useData() {
       
       // Process in batches of 500
       while (true) {
-        const q = fQuery(fCollection(db, entryPath), fLimit(500));
+        const q = query(collection(db, entryPath), limit(500));
         const snap = await getDocs(q);
         
         if (snap.empty) break;
@@ -216,18 +219,17 @@ export function useData() {
 
   const clearAllExpenses = async (onProgress?: (deleted: number, total: number) => void) => {
     if (!user) return;
-    const { writeBatch, getDocs, collection: fCollection, query: fQuery, limit: fLimit } = await import('firebase/firestore');
     const expensePath = `users/${user.uid}/expenses`;
     
     try {
-      const totalSnap = await getDocs(fCollection(db, expensePath));
+      const totalSnap = await getDocs(collection(db, expensePath));
       const total = totalSnap.size;
       if (total === 0) return;
 
       let deletedCount = 0;
 
       while (true) {
-        const q = fQuery(fCollection(db, expensePath), fLimit(500));
+        const q = query(collection(db, expensePath), limit(500));
         const snap = await getDocs(q);
         
         if (snap.empty) break;
@@ -263,9 +265,8 @@ export function useData() {
   const updateSettings = async (newSettings: UserSettings) => {
     if (!user) return;
     const settingsPath = `users/${user.uid}`;
-    const { setDoc, doc: fDoc } = await import('firebase/firestore');
     try {
-      await setDoc(fDoc(db, settingsPath), newSettings);
+      await setDoc(doc(db, settingsPath), newSettings);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, settingsPath);
     }
@@ -276,7 +277,6 @@ export function useData() {
     onProgress?: (current: number, total: number, phase: 'settings' | 'entries' | 'expenses') => void
   ) => {
     if (!user) return;
-    const { writeBatch, doc: fDoc, collection: fCollection, Timestamp: fTimestamp } = await import('firebase/firestore');
 
     // 1. Restore Settings
     if (onProgress) onProgress(0, 1, 'settings');
@@ -298,13 +298,13 @@ export function useData() {
       for (const chunk of chunks) {
         const batch = writeBatch(db);
         chunk.forEach(entry => {
-          const ref = fDoc(fCollection(db, `users/${user.uid}/entries`));
+          const ref = doc(collection(db, `users/${user.uid}/entries`));
           // Convert serialized timestamps back to Firestore Timestamps
           const entryData = { 
             ...entry, 
-            date: entry.date instanceof fTimestamp 
+            date: entry.date instanceof Timestamp 
               ? entry.date 
-              : fTimestamp.fromMillis((entry.date as any).seconds * 1000) 
+              : Timestamp.fromMillis((entry.date as any).seconds * 1000) 
           };
           delete entryData.id;
           batch.set(ref, entryData);
@@ -327,12 +327,12 @@ export function useData() {
       for (const chunk of chunks) {
         const batch = writeBatch(db);
         chunk.forEach(exp => {
-          const ref = fDoc(fCollection(db, `users/${user.uid}/expenses`));
+          const ref = doc(collection(db, `users/${user.uid}/expenses`));
           const expData = { 
             ...exp, 
-            date: exp.date instanceof fTimestamp 
+            date: exp.date instanceof Timestamp 
               ? exp.date 
-              : fTimestamp.fromMillis((exp.date as any).seconds * 1000) 
+              : Timestamp.fromMillis((exp.date as any).seconds * 1000) 
           };
           delete expData.id;
           batch.set(ref, expData);
@@ -347,7 +347,6 @@ export function useData() {
   const recalculateAllEntryCosts = async (manualSettings?: UserSettings) => {
     const settingsToUse = manualSettings || settings;
     if (!user || !settingsToUse || entries.length === 0) return;
-    const { writeBatch } = await import('firebase/firestore');
     const entryPath = `users/${user.uid}/entries`;
     
     try {
