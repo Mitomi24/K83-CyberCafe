@@ -667,15 +667,26 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                           onClick={async () => {
                             const testUrl = getApiUrl('/api/health');
                             try {
+                              // We use redirect: 'manual' to catch 302s that indicate auth issues
                               const res = await fetch(testUrl, {
                                 method: 'GET',
-                                headers: { 'Accept': 'application/json' }
+                                headers: { 
+                                  'Accept': 'application/json',
+                                  'X-App-Version': APP_VERSION 
+                                },
+                                redirect: 'manual' 
                               });
+                              
+                              if (res.type === 'opaqueredirect' || res.status === 302 || res.status === 301) {
+                                alert(`REDIRECT DETECTED (HTTP ${res.status})\n\nCRITICAL: The Shared App URL is redirecting to a login page. This means the app is NOT SHARED PUBLICLY.\n\nTo fix this:\n1. Open AI Studio.\n2. Click "Share" in the top right.\n3. Ensure "Public / Shared with everyone" or similar is selected.\n4. Use the Shared App URL (ais-pre), NOT the development URL (ais-dev).`);
+                                return;
+                              }
+
                               if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                               const data = await res.json();
                               alert(`API Success!\nStatus: ${data.status}\nBackend: ${new URL(testUrl).hostname}`);
                             } catch (err: any) {
-                              alert(`API Failed!\nError: ${err.message}`);
+                              alert(`API Failed!\nError: ${err.message}\nThis is likely a CORS issue or the URL is unreachable.`);
                             }
                           }}
                           className="flex-1 text-[9px] font-bold text-indigo-600 hover:bg-white py-1 rounded transition-colors border border-indigo-100/50"
