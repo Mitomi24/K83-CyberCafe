@@ -44,7 +44,12 @@ async function startServer() {
       config: {
         hasClientId: !!(process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID),
         hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
-        appUrl: process.env.APP_URL || 'not set'
+        appUrl: process.env.APP_URL || 'not set',
+        nodeEnv: process.env.NODE_ENV || 'development'
+      },
+      headers: {
+        origin: req.headers.origin || 'none',
+        host: req.headers.host || 'none'
       }
     });
   });

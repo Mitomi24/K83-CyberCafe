@@ -231,9 +231,9 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
         }
       };
       window.addEventListener('message', handleMessage);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Failed to connect to Google Drive");
+      alert("Failed to connect to Google Drive: " + (e.message || "Network Error"));
     }
   };
 
@@ -655,11 +655,25 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                       <div className="font-mono text-[10px] text-slate-600 break-all px-1">
                         {apiOverride || import.meta.env.VITE_API_URL || 'Local / Same-Origin'}
                       </div>
+                      <button 
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(getApiUrl('/api/health'));
+                            const data = await res.json();
+                            alert("Connection Success: " + data.status + "\nApp URL: " + data.config.appUrl);
+                          } catch (err: any) {
+                            alert("Connection Failed: " + err.message);
+                          }
+                        }}
+                        className="w-full mt-2 text-[9px] font-bold text-indigo-600 hover:bg-white py-1 rounded transition-colors border border-transparent hover:border-indigo-100"
+                      >
+                        Test Connection
+                      </button>
                     </div>
 
                     {window.location.origin.includes('github.io') && !import.meta.env.VITE_API_URL && !apiOverride && (
                       <div className="bg-amber-50 border border-amber-200 p-2 rounded text-[10px] text-amber-800 animate-pulse">
-                        <strong>Action Required:</strong> Copy the "App URL" from AI Studio and paste it in the "Manual API Override" box above.
+                        <strong>Action Required:</strong> Copy the <b>Shared App URL</b> (starting with <code className="bg-amber-100 px-1 rounded">ais-pre</code>) from AI Studio and paste it in the "Manual API Override" box above. Avoid using the <code className="bg-amber-100 px-1 rounded">ais-dev</code> URL as it requires an active session.
                       </div>
                     )}
                   </div>
