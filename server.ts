@@ -15,7 +15,15 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(cors()); // Enable CORS for all origins (or configure strictly if preferred)
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Allow all origins in development and production
+      callback(null, true);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  }));
   app.use(express.json({ limit: '50mb' }));
 
   // Google OAuth Configuration
@@ -47,9 +55,11 @@ async function startServer() {
         appUrl: process.env.APP_URL || 'not set',
         nodeEnv: process.env.NODE_ENV || 'development'
       },
-      headers: {
+      request: {
         origin: req.headers.origin || 'none',
-        host: req.headers.host || 'none'
+        host: req.headers.host || 'none',
+        method: req.method,
+        url: req.url
       }
     });
   });
