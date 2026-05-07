@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserSettings, AppBackup, KwhRateRange } from '../types';
-import { Settings as SettingsIcon, Info, Database, Trash2, AlertTriangle, Calendar, Plus, RefreshCw, Download, UploadCloud, Link as LinkIcon, CheckCircle2, CloudOff, HardDrive, Pencil, X, History as HistoryIcon } from 'lucide-react';
+import { Settings as SettingsIcon, Info, Database, Trash2, AlertTriangle, Calendar, Plus, RefreshCw, Download, UploadCloud, Link as LinkIcon, CheckCircle2, CloudOff, HardDrive, Pencil, X, History as HistoryIcon, Zap } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useData } from '../lib/useData';
 import { APP_VERSION } from '../version';
@@ -47,6 +47,17 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
   const [driveFiles, setDriveFiles] = useState<any[]>([]);
   const [isLoadingDriveFiles, setIsLoadingDriveFiles] = useState(false);
   const [isUploadingToDrive, setIsUploadingToDrive] = useState(false);
+  const [apiOverride, setApiOverride] = useState(typeof window !== 'undefined' ? localStorage.getItem('K83_API_URL_OVERRIDE') || '' : '');
+
+  const saveApiOverride = (url: string) => {
+    const cleanUrl = url.trim();
+    setApiOverride(cleanUrl);
+    if (cleanUrl) {
+      localStorage.setItem('K83_API_URL_OVERRIDE', cleanUrl);
+    } else {
+      localStorage.removeItem('K83_API_URL_OVERRIDE');
+    }
+  };
 
   const handleManualCloudBackup = async () => {
     setIsUploadingToDrive(true);
@@ -391,7 +402,8 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
       </div>
 
       <div className="grid grid-cols-1 gap-8">
-        {/* General Settings Section */}
+        {/* General Settings Section Hidden */}
+        {/*
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit flex flex-col">
           <div className="p-6 border-b border-slate-100 bg-indigo-50/10 flex items-center">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -400,9 +412,45 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
             </h3>
           </div>
           <div className="p-8">
-            <p className="text-xs text-slate-500 italic">Adjust your operational parameters below. Billing history and rates can be synchronized using the specific buttons in the Billing section.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Baseline Rate ({currency}/kWh)</label>
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1">
+                    <Zap className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={kwhRate}
+                      onChange={(e) => setKwhRate(e.target.value)}
+                      onBlur={() => onUpdate({ ...settings, kwhRate: Number(kwhRate) })}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-2 border-slate-100 rounded-xl text-sm font-mono font-bold focus:border-indigo-500 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+                <p className="text-[9px] text-amber-600 font-medium italic">Note: If Billing Ranges are defined, this baseline is ignored and 0 is used for unmapped dates.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">System Currency</label>
+                <select
+                  value={currency}
+                  onChange={(e) => {
+                    setCurrency(e.target.value);
+                    onUpdate({ ...settings, currency: e.target.value });
+                  }}
+                  className="w-full px-4 py-2.5 bg-slate-50 border-2 border-slate-100 rounded-xl text-sm font-bold focus:border-indigo-500 outline-none transition-all appearance-none"
+                >
+                  <option value="₱">PHP (₱)</option>
+                  <option value="$">USD ($)</option>
+                  <option value="€">EUR (€)</option>
+                  <option value="£">GBP (£)</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
+        */}
 
         {/* Billing History Section */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit flex flex-col">
@@ -568,18 +616,50 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                     </button>
                   </div>
                   
-                  <div className="space-y-2">
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      If you see <span className="font-mono bg-slate-100 px-1 rounded text-red-500">Unexpected token &lt;</span>, it means your frontend cannot find the backend.
+                  <div className="space-y-4">
+                    <p className="text-[11px] text-slate-600 leading-relaxed italic">
+                      If you see <span className="font-mono bg-slate-100 px-1 rounded text-red-500">Unexpected token &lt;</span>, it means your frontend is served from a different domain (like GitHub) and cannot find the backend.
                     </p>
                     
-                    <div className="font-mono text-[10px] text-slate-600 bg-white border border-slate-200 px-2 py-1.5 rounded break-all">
-                      Current API: {window.location.origin.includes('github.io') ? (import.meta.env.VITE_API_URL || 'MISSING (Set VITE_API_URL)') : 'Local/Same-Origin'}
+                    <div className="space-y-2">
+                       <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Manual API Override (Runtime)</label>
+                       <div className="flex gap-2">
+                        <input 
+                          type="text"
+                          value={apiOverride}
+                          onChange={(e) => saveApiOverride(e.target.value)}
+                          placeholder="Paste AI Studio App URL here..."
+                          className="flex-1 font-mono text-[10px] text-slate-600 bg-white border border-slate-200 px-2 py-1.5 rounded outline-none focus:border-indigo-500 transition-all"
+                        />
+                        {apiOverride && (
+                          <button 
+                            onClick={() => {
+                              saveApiOverride('');
+                              window.location.reload();
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-red-500 bg-white border border-slate-200 rounded"
+                            title="Clear override"
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                       </div>
+                       <p className="text-[9px] text-slate-400 italic">Overrides VITE_API_URL. Requires reload to apply fully.</p>
                     </div>
 
-                    {window.location.origin.includes('github.io') && !import.meta.env.VITE_API_URL && (
+                    <div className="bg-slate-100/50 p-2 rounded space-y-1">
+                      <div className="flex items-center justify-between text-[9px] text-slate-500 font-bold uppercase tracking-tight">
+                        <span>Current Active API</span>
+                        {import.meta.env.VITE_API_URL ? <span className="text-emerald-500">Build-set</span> : <span className="text-slate-400">Not set in build</span>}
+                      </div>
+                      <div className="font-mono text-[10px] text-slate-600 break-all px-1">
+                        {apiOverride || import.meta.env.VITE_API_URL || 'Local / Same-Origin'}
+                      </div>
+                    </div>
+
+                    {window.location.origin.includes('github.io') && !import.meta.env.VITE_API_URL && !apiOverride && (
                       <div className="bg-amber-50 border border-amber-200 p-2 rounded text-[10px] text-amber-800 animate-pulse">
-                        <strong>Action Required:</strong> Copy the "App URL" from AI Studio and add it as <code className="bg-amber-100 px-1 rounded">VITE_API_URL</code> in your project's Secrets.
+                        <strong>Action Required:</strong> Copy the "App URL" from AI Studio and paste it in the "Manual API Override" box above.
                       </div>
                     )}
                   </div>
