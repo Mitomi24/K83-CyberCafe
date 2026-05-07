@@ -655,20 +655,50 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                       <div className="font-mono text-[10px] text-slate-600 break-all px-1">
                         {apiOverride || import.meta.env.VITE_API_URL || 'Local / Same-Origin'}
                       </div>
-                      <button 
-                        onClick={async () => {
-                          try {
-                            const res = await fetch(getApiUrl('/api/health'));
-                            const data = await res.json();
-                            alert("Connection Success: " + data.status + "\nApp URL: " + data.config.appUrl);
-                          } catch (err: any) {
-                            alert("Connection Failed: " + err.message);
-                          }
-                        }}
-                        className="w-full mt-2 text-[9px] font-bold text-indigo-600 hover:bg-white py-1 rounded transition-colors border border-transparent hover:border-indigo-100"
-                      >
-                        Test Connection
-                      </button>
+                      
+                      { (apiOverride || import.meta.env.VITE_API_URL || '').includes('ais-dev') && (
+                        <div className="bg-red-50 border border-red-200 p-2 rounded text-[10px] text-red-800 mt-2">
+                          <strong>URL Mismatch:</strong> You are using a <b>Development URL</b> (ais-dev). CORS calls from external domains (GitHub) will likely fail. Please use the <b>Shared App URL</b> (ais-pre) from AI Studio.
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 mt-2">
+                        <button 
+                          onClick={async () => {
+                            const testUrl = getApiUrl('/api/health');
+                            try {
+                              const res = await fetch(testUrl, {
+                                method: 'GET',
+                                headers: { 'Accept': 'application/json' }
+                              });
+                              if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                              const data = await res.json();
+                              alert(`API Success!\nStatus: ${data.status}\nBackend: ${new URL(testUrl).hostname}`);
+                            } catch (err: any) {
+                              alert(`API Failed!\nError: ${err.message}`);
+                            }
+                          }}
+                          className="flex-1 text-[9px] font-bold text-indigo-600 hover:bg-white py-1 rounded transition-colors border border-indigo-100/50"
+                        >
+                          Test API
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const { db } = await import('../lib/firebase');
+                              const { doc, getDocFromServer } = await import('firebase/firestore');
+                              const start = Date.now();
+                              const snap = await getDocFromServer(doc(db, 'system', 'connection_test'));
+                              alert(`Firestore Success!\nLatency: ${Date.now() - start}ms`);
+                            } catch (err: any) {
+                              alert(`Firestore Failed!\nCode: ${err.code}\nMessage: ${err.message}`);
+                            }
+                          }}
+                          className="flex-1 text-[9px] font-bold text-emerald-600 hover:bg-white py-1 rounded transition-colors border border-emerald-100/50"
+                        >
+                          Test Firestore
+                        </button>
+                      </div>
                     </div>
 
                     {window.location.origin.includes('github.io') && !import.meta.env.VITE_API_URL && !apiOverride && (

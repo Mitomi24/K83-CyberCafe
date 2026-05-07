@@ -15,15 +15,35 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Extremely permissive CORS for cross-domain debugging
   app.use(cors({
-    origin: (origin, callback) => {
-      // Allow all origins in development and production
-      callback(null, true);
-    },
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
   }));
+  
+  // Custom CORS preflight handler to be absolutely sure
+  app.options('*', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.sendStatus(204);
+  });
+  
+  // Enhanced Request Logger with response status
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      const status = res.statusCode;
+      const color = status >= 400 ? '\x1b[31m' : (status >= 300 ? '\x1b[33m' : '\x1b[32m');
+      console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} ${color}${status}\x1b[0m ${duration}ms - Origin: ${req.headers.origin || 'none'}`);
+    });
+    next();
+  });
+  
   app.use(express.json({ limit: '50mb' }));
 
   // Google OAuth Configuration
