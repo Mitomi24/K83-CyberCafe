@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './AuthContext';
+import { getApiUrl } from './utils';
 import { DailyEntry, BusinessExpense, UserSettings, AppBackup } from '../types';
 import { handleFirestoreError, OperationType } from './error-handler';
 
@@ -86,19 +87,19 @@ export function useData() {
     // Logic to find rate from history if not provided
     let rateToUse = customKwhRate;
     if (rateToUse === undefined) {
-      if (settings.rateHistory && settings.rateHistory.length > 0) {
-        const range = settings.rateHistory.find(r => {
-          if (!r.startDate || !r.endDate) return false;
-          // Direct string comparison of YYYY-MM-DD is safe and correct here
-          return dStr >= r.startDate && dStr <= r.endDate;
-        });
-        rateToUse = range ? range.rate : settings.kwhRate;
-      } else {
-        rateToUse = settings.kwhRate;
-      }
+      // Find range in history
+      const range = (settings.rateHistory || []).find(r => {
+        if (!r.startDate || !r.endDate) return false;
+        // Direct string comparison of YYYY-MM-DD is safe and correct here
+        return dStr >= r.startDate && dStr <= r.endDate;
+      });
+      
+      // Default to 0 if not within any range (as requested)
+      // If history is completely empty, we still default to 0 as per instructions
+      rateToUse = range ? range.rate : 0;
     }
 
-    const energyCost = (wattage / 1000) * hours * rateToUse;
+    const energyCost = (wattage / 1000) * hours * (rateToUse || 0);
     const entryPath = `users/${user.uid}/entries`;
     try {
       await addDoc(collection(db, entryPath), {
@@ -350,39 +351,48 @@ export function useData() {
     const entryPath = `users/${user.uid}/entries`;
     
     try {
-      const batch = writeBatch(db);
-      let count = 0;
+      // Process in batches of 500 for Firestore limits
+      const entryChunks = [];
+      for (let i = 0; i < entries.length; i += 500) {
+        entryChunks.push(entries.slice(i, i + 500));
+      }
 
-      entries.forEach(entry => {
-        if (!entry.id) return;
-        
-        const entryDate = entry.date.toDate();
-        const year = entryDate.getFullYear();
-        const month = String(entryDate.getMonth() + 1).padStart(2, '0');
-        const day = String(entryDate.getDate()).padStart(2, '0');
-        const dStr = `${year}-${month}-${day}`;
-        
-        let newRate = settingsToUse.kwhRate;
-        if (settingsToUse.rateHistory && settingsToUse.rateHistory.length > 0) {
-          const range = settingsToUse.rateHistory.find(r => {
-            if (!r.startDate || !r.endDate) return false;
-            return dStr >= r.startDate && dStr <= r.endDate;
+      for (const chunk of entryChunks) {
+        const batch = writeBatch(db);
+        let count = 0;
+
+        chunk.forEach(entry => {
+          if (!entry.id) return;
+          
+          const entryDate = entry.date.toDate();
+          const year = entryDate.getFullYear();
+          const month = String(entryDate.getMonth() + 1).padStart(2, '0');
+          const day = String(entryDate.getDate()).padStart(2, '0');
+          const dStr = `${year}-${month}-${day}`;
+          
+          // Default to 0 as per user request if not within any range
+          let newRate = 0; 
+          if (settingsToUse.rateHistory && settingsToUse.rateHistory.length > 0) {
+            const range = settingsToUse.rateHistory.find(r => {
+              if (!r.startDate || !r.endDate) return false;
+              return dStr >= r.startDate && dStr <= r.endDate;
+            });
+            if (range) newRate = range.rate;
+          }
+
+          const wattage = entry.wattageUsage || 0;
+          const hours = entry.durationHours || 0;
+          const newEnergyCost = (wattage / 1000) * hours * newRate;
+          
+          batch.update(doc(db, entryPath, entry.id), {
+            kwhRate: newRate,
+            energyCost: newEnergyCost
           });
-          if (range) newRate = range.rate;
-        }
-
-        const wattage = entry.wattageUsage || 0;
-        const hours = entry.durationHours || 0;
-        const newEnergyCost = (wattage / 1000) * hours * newRate;
-        
-        batch.update(doc(db, entryPath, entry.id), {
-          kwhRate: newRate,
-          energyCost: newEnergyCost
+          count++;
         });
-        count++;
-      });
 
-      if (count > 0) await batch.commit();
+        if (count > 0) await batch.commit();
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, entryPath);
     }
@@ -406,7 +416,8 @@ export function useData() {
     const backup = manualBackup || createBackup();
     
     try {
-      const response = await fetch('/api/backup/drive', {
+      const apiUrl = getApiUrl('/api/backup/drive');
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -416,8 +427,14 @@ export function useData() {
         })
       });
 
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned an invalid response (non-JSON).");
+      }
+      
       if (!response.ok) {
-        throw new Error('Drive upload failed');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Drive upload failed');
       }
 
       const result = await response.json();

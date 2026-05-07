@@ -7,7 +7,7 @@ import { useAuth } from '../lib/AuthContext';
 import { format } from 'date-fns';
 import { Trash2, History as HistoryIcon, Download, ChevronLeft, ChevronRight, ArrowUpDown, TrendingUp, Edit2, CloudOff, Link as LinkIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { formatCurrency, cn } from '../lib/utils';
+import { formatCurrency, cn, getApiUrl } from '../lib/utils';
 import * as XLSX from 'xlsx';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -288,7 +288,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
   // Cloud connection helper
   const handleConnectDrive = async () => {
     try {
-      const response = await fetch(`/api/auth/google/url${user ? `?uid=${user.uid}` : ''}`);
+      const apiUrl = getApiUrl(`/api/auth/google/url${user ? `?uid=${user.uid}` : ''}`);
+      const response = await fetch(apiUrl);
+      
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Non-JSON response from server:", text.substring(0, 500));
+        
+        if (window.location.hostname.includes('github.io') && !import.meta.env.VITE_API_URL) {
+          throw new Error("Backend connection missing. Since you are on GitHub Pages, you must set VITE_API_URL in AI Studio Secrets. Go to Settings > Connection Settings for instructions.");
+        }
+        
+        throw new Error("Server returned an invalid response (non-JSON). This usually means the server is starting up or misconfigured.");
+      }
+
       const data = await response.json();
       
       if (!response.ok) {
@@ -418,6 +432,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
                   onCancel={() => setEditingEntry(null)}
                   currency={settings.currency} 
                   defaultKwhRate={settings.kwhRate} 
+                  rateHistory={settings.rateHistory || []}
                   latestMeterReading={filteredEntries[0]?.meterReading}
                 />
               ) : (
@@ -650,7 +665,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
                                     {(((entry.wattageUsage || 0) * (entry.durationHours || 0)) / 1000).toFixed(2)} kWh
                                   </td>
                                   <td className="px-6 py-4 font-mono text-[11px] text-slate-400">
-                                    {entry.kwhRate?.toFixed(2) || settings.kwhRate.toFixed(2)}
+                                    {entry.kwhRate != null ? entry.kwhRate.toFixed(2) : settings.kwhRate.toFixed(2)}
                                   </td>
                                   <td className="px-6 py-4 text-amber-600 font-mono font-bold">
                                     {formatCurrency(entry.energyCost, settings.currency)}

@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { google } from "googleapis";
 import dotenv from "dotenv";
+import cors from "cors";
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(cors()); // Enable CORS for all origins (or configure strictly if preferred)
   app.use(express.json({ limit: '50mb' }));
 
   // Google OAuth Configuration

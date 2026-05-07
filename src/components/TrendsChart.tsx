@@ -87,103 +87,7 @@ export const TrendsChart: React.FC<TrendsChartProps> = ({ entries, expenses, set
 
       if (chartType === 'bar') {
         return (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="date" 
-                fontSize={10} 
-                tickLine={false} 
-                axisLine={false}
-                tick={{ fill: '#64748b' }}
-              />
-              <YAxis 
-                fontSize={10} 
-                tickLine={false} 
-                axisLine={false} 
-                tickFormatter={(value) => `${settings.currency}${value}`}
-                tick={{ fill: '#64748b' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  borderRadius: '12px', 
-                  border: '1px solid #e2e8f0', 
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
-                  padding: '12px',
-                  color: '#1e293b'
-                }}
-                itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
-                formatter={(value, name) => {
-                  if (name === 'Customers') return [value, name];
-                  return [`${settings.currency}${value}`, name];
-                }}
-              />
-              <Legend iconType="circle" />
-              <Bar dataKey="profit" fill="#10b981" radius={[4, 4, 0, 0]} name={category === 'printing' ? "Net Earnings" : "Net Profit"} />
-              <Bar dataKey="cost" fill="#f59e0b" radius={[4, 4, 0, 0]} name={category === 'printing' ? "Expenses" : "Energy Cost"} />
-              {category === 'printing' && <Bar dataKey="customers" fill="#6366f1" radius={[4, 4, 0, 0]} name="Customers" />}
-            </BarChart>
-          </ResponsiveContainer>
-        );
-      }
-
-      if (chartType === 'line') {
-        return (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="date" 
-                fontSize={10} 
-                tickLine={false} 
-                axisLine={false}
-                tick={{ fill: '#64748b' }}
-              />
-              <YAxis 
-                fontSize={10} 
-                tickLine={false} 
-                axisLine={false} 
-                tickFormatter={(value) => `${settings.currency}${value}`}
-                tick={{ fill: '#64748b' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  borderRadius: '12px', 
-                  border: '1px solid #e2e8f0', 
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
-                  padding: '12px',
-                  color: '#1e293b'
-                }}
-                itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
-                formatter={(value, name) => {
-                  if (name === 'Customers') return [value, name];
-                  return [`${settings.currency}${value}`, name];
-                }}
-              />
-              <Legend iconType="circle" />
-              <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={4} dot={{ r: 4 }} activeDot={{ r: 6 }} name={category === 'printing' ? "Net Earnings" : "Net Profit"} />
-              <Line type="monotone" dataKey="cost" stroke="#f59e0b" strokeWidth={4} dot={{ r: 4 }} activeDot={{ r: 6 }} name={category === 'printing' ? "Expenses" : "Energy Cost"} />
-              {category === 'printing' && <Line type="monotone" dataKey="customers" stroke="#6366f1" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} name="Customers" />}
-            </LineChart>
-          </ResponsiveContainer>
-        );
-      }
-
-      return (
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart {...commonProps}>
-            <defs>
-              <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.15}/>
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-              </linearGradient>
-              <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.15}/>
-                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
-              </linearGradient>
-            </defs>
+          <BarChart {...commonProps}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
             <XAxis 
               dataKey="date" 
@@ -215,11 +119,101 @@ export const TrendsChart: React.FC<TrendsChartProps> = ({ entries, expenses, set
               }}
             />
             <Legend iconType="circle" />
-            <Area type="monotone" dataKey="profit" stroke="#10b981" fillOpacity={1} fill="url(#colorProfit)" name={category === 'printing' ? "Net Earnings" : "Net Profit"} strokeWidth={3} />
-            <Area type="monotone" dataKey="cost" stroke="#f59e0b" fillOpacity={1} fill="url(#colorCost)" name={category === 'printing' ? "Expenses" : "Energy Cost"} strokeWidth={3} />
-            {category === 'printing' && <Area type="monotone" dataKey="customers" stroke="#6366f1" fillOpacity={0.1} fill="#6366f1" name="Customers" strokeWidth={2} strokeDasharray="5 5" />}
-          </AreaChart>
-        </ResponsiveContainer>
+            <Bar dataKey="profit" fill="#10b981" radius={[4, 4, 0, 0]} name={category === 'printing' ? "Net Earnings" : "Net Profit"} />
+            <Bar dataKey="cost" fill="#f59e0b" radius={[4, 4, 0, 0]} name={category === 'printing' ? "Expenses" : "Energy Cost"} />
+            {category === 'printing' && <Bar dataKey="customers" fill="#6366f1" radius={[4, 4, 0, 0]} name="Customers" />}
+          </BarChart>
+        );
+      }
+
+      if (chartType === 'line') {
+        return (
+          <LineChart {...commonProps}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+            <XAxis 
+              dataKey="date" 
+              fontSize={10} 
+              tickLine={false} 
+              axisLine={false}
+              tick={{ fill: '#64748b' }}
+            />
+            <YAxis 
+              fontSize={10} 
+              tickLine={false} 
+              axisLine={false} 
+              tickFormatter={(value) => `${settings.currency}${value}`}
+              tick={{ fill: '#64748b' }}
+            />
+            <Tooltip 
+              contentStyle={{ 
+                backgroundColor: '#fff', 
+                borderRadius: '12px', 
+                border: '1px solid #e2e8f0', 
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                padding: '12px',
+                color: '#1e293b'
+              }}
+              itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+              formatter={(value, name) => {
+                if (name === 'Customers') return [value, name];
+                return [`${settings.currency}${value}`, name];
+              }}
+            />
+            <Legend iconType="circle" />
+            <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={4} dot={{ r: 4 }} activeDot={{ r: 6 }} name={category === 'printing' ? "Net Earnings" : "Net Profit"} />
+            <Line type="monotone" dataKey="cost" stroke="#f59e0b" strokeWidth={4} dot={{ r: 4 }} activeDot={{ r: 6 }} name={category === 'printing' ? "Expenses" : "Energy Cost"} />
+            {category === 'printing' && <Line type="monotone" dataKey="customers" stroke="#6366f1" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} name="Customers" />}
+          </LineChart>
+        );
+      }
+
+      return (
+        <AreaChart {...commonProps}>
+          <defs>
+            <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#10b981" stopOpacity={0.15}/>
+              <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+            </linearGradient>
+            <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.15}/>
+              <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+          <XAxis 
+            dataKey="date" 
+            fontSize={10} 
+            tickLine={false} 
+            axisLine={false}
+            tick={{ fill: '#64748b' }}
+          />
+          <YAxis 
+            fontSize={10} 
+            tickLine={false} 
+            axisLine={false} 
+            tickFormatter={(value) => `${settings.currency}${value}`}
+            tick={{ fill: '#64748b' }}
+          />
+          <Tooltip 
+            contentStyle={{ 
+              backgroundColor: '#fff', 
+              borderRadius: '12px', 
+              border: '1px solid #e2e8f0', 
+              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+              padding: '12px',
+              color: '#1e293b'
+            }}
+            itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+            formatter={(value, name) => {
+              if (name === 'Customers') return [value, name];
+              return [`${settings.currency}${value}`, name];
+            }}
+          />
+          <Legend iconType="circle" />
+          <Area type="monotone" dataKey="profit" stroke="#10b981" fillOpacity={1} fill="url(#colorProfit)" name={category === 'printing' ? "Net Earnings" : "Net Profit"} strokeWidth={3} />
+          <Area type="monotone" dataKey="cost" stroke="#f59e0b" fillOpacity={1} fill="url(#colorCost)" name={category === 'printing' ? "Expenses" : "Energy Cost"} strokeWidth={3} />
+          {category === 'printing' && <Area type="monotone" dataKey="customers" stroke="#6366f1" fillOpacity={0.1} fill="#6366f1" name="Customers" strokeWidth={2} strokeDasharray="5 5" />}
+        </AreaChart>
       );
     };
 
@@ -279,8 +273,10 @@ export const TrendsChart: React.FC<TrendsChartProps> = ({ entries, expenses, set
           </div>
         </div>
 
-      <div className="h-[300px] w-full">
-        {renderChart()}
+      <div className="h-[300px] w-full relative">
+        <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+          {renderChart()}
+        </ResponsiveContainer>
       </div>
     </div>
   );

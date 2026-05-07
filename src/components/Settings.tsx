@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { UserSettings, AppBackup } from '../types';
+import { UserSettings, AppBackup, KwhRateRange } from '../types';
 import { Settings as SettingsIcon, Info, Database, Trash2, AlertTriangle, Calendar, Plus, RefreshCw, Download, UploadCloud, Link as LinkIcon, CheckCircle2, CloudOff, HardDrive, Pencil, X, History as HistoryIcon } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useData } from '../lib/useData';
 import { APP_VERSION } from '../version';
+import { getApiUrl } from '../lib/utils';
 
 interface SettingsProps {
   settings: UserSettings;
@@ -69,7 +70,8 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
     
     setIsLoadingDriveFiles(true);
     try {
-      const response = await fetch('/api/backup/drive/list', {
+      const apiUrl = getApiUrl('/api/backup/drive/list');
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -77,6 +79,12 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
           folderId: settings.googleDriveBackup.folderId
         })
       });
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned an invalid response (non-JSON).");
+      }
+
       const data = await response.json();
       if (data.success) {
         setDriveFiles(data.files);
@@ -107,8 +115,9 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
       if (!confirmRestore) return;
 
       setRestoreProgress({ current: 0, total: 0, active: true, phase: null });
-
-      const response = await fetch('/api/backup/drive/fetch', {
+      
+      const apiUrl = getApiUrl('/api/backup/drive/fetch');
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,6 +125,12 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
           fileId
         })
       });
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned an invalid response (non-JSON).");
+      }
+
       const data = await response.json();
       
       if (data.success) {
@@ -177,7 +192,14 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
 
   const handleConnectDrive = async () => {
     try {
-      const response = await fetch(`/api/auth/google/url?uid=${user?.uid}`);
+      const apiUrl = getApiUrl(`/api/auth/google/url?uid=${user?.uid}`);
+      const response = await fetch(apiUrl);
+      
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Server returned an invalid response (non-JSON).");
+      }
+
       const { url } = await response.json();
       const popup = window.open(url, 'google_auth', 'width=600,height=700');
       
@@ -214,28 +236,45 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
     });
   };
 
+  const autoApplyChanges = async (history: KwhRateRange[]) => {
+    setIsRecalculating(true);
+    try {
+      const newSettings = { ...settings, rateHistory: history };
+      await onUpdate(newSettings);
+      await recalculateAllEntryCosts(newSettings);
+    } catch (e) {
+      console.error('Failed to auto-apply rates:', e);
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
   const handleAddRange = () => {
     if (!newRange.startDate || !newRange.endDate || !newRange.rate) return;
     
+    let updatedHistory;
     if (editingIndex !== null) {
-      setRateHistory(prev => {
-        const updated = [...prev];
-        updated[editingIndex] = {
-          startDate: newRange.startDate,
-          endDate: newRange.endDate,
-          rate: Number(newRange.rate)
-        };
-        return updated.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-      });
-      setEditingIndex(null);
-    } else {
-      setRateHistory(prev => [...prev, {
+      updatedHistory = [...rateHistory];
+      updatedHistory[editingIndex] = {
         startDate: newRange.startDate,
         endDate: newRange.endDate,
         rate: Number(newRange.rate)
-      }].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()));
+      };
+      updatedHistory.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+      setEditingIndex(null);
+    } else {
+      updatedHistory = [...rateHistory, {
+        startDate: newRange.startDate,
+        endDate: newRange.endDate,
+        rate: Number(newRange.rate)
+      }].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
     }
+    
+    setRateHistory(updatedHistory);
     setNewRange({ startDate: '', endDate: '', rate: '' });
+    
+    // Auto-apply to ledger
+    autoApplyChanges(updatedHistory);
   };
 
   const handleEditRange = (index: number) => {
@@ -255,7 +294,9 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
   };
 
   const handleRemoveRange = (index: number) => {
-    setRateHistory(prev => prev.filter((_, i) => i !== index));
+    const updatedHistory = rateHistory.filter((_, i) => i !== index);
+    setRateHistory(updatedHistory);
+    autoApplyChanges(updatedHistory);
   };
 
   const handleRecalculate = async () => {
@@ -365,37 +406,17 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
 
         {/* Billing History Section */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit flex flex-col">
-          <div className="p-6 border-b border-slate-100 bg-indigo-50/10 flex items-center justify-between">
+          <div className="p-6 border-b border-slate-100 bg-indigo-50/10 flex items-center">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
               <Calendar size={18} className="text-indigo-600" />
               Billing Ranges & History
             </h3>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  onUpdate({ ...settings, rateHistory });
-                  alert("Billing history updated successfully.");
-                }}
-                className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 px-3 py-2 rounded-lg transition-all border border-emerald-100"
-              >
-                Sync Ranges
-              </button>
-              <button
-                type="button"
-                onClick={handleRecalculate}
-                disabled={isRecalculating}
-                className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-indigo-600 hover:bg-white px-3 py-2 rounded-lg transition-all border border-indigo-100 shadow-sm"
-              >
-                <RefreshCw size={14} className={isRecalculating ? "animate-spin" : ""} />
-                Apply Rates to Ledger
-              </button>
-            </div>
           </div>
           
           <div className="px-6 py-4 bg-slate-50 border-b border-slate-100">
-            <p className="text-[10px] text-slate-500 leading-relaxed italic">
-              <strong>Workflow:</strong> 1. Add specific date ranges when you receive your monthly bill. 2. Click <strong>Sync Ranges</strong> to store the list. 3. Click <strong>Apply Rates to Ledger</strong> to recalculate profit history.
+            <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-widest flex items-center gap-2">
+              <CheckCircle2 size={12} className="text-emerald-500" /> 
+              Automation Active: Billing ranges are now automatically applied to your records.
             </p>
           </div>
           
@@ -524,6 +545,44 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                   <p className="text-[10px] text-slate-500 leading-relaxed">
                     Automatically upload a secure JSON backup to your Google Drive every day when you access the system.
                   </p>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                      <LinkIcon size={12} className="text-indigo-500" /> Backend API Connection
+                    </span>
+                    <button
+                      onClick={() => {
+                        const url = window.location.origin.includes('github.io') ? (import.meta.env.VITE_API_URL || '') : window.location.origin;
+                        if (!url) {
+                          alert('API URL is not set yet.');
+                          return;
+                        }
+                        navigator.clipboard.writeText(url);
+                        alert('URL copied! Set this as VITE_API_URL in your environment secrets.');
+                      }}
+                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 transition-colors"
+                    >
+                      Copy App URL
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      If you see <span className="font-mono bg-slate-100 px-1 rounded text-red-500">Unexpected token &lt;</span>, it means your frontend cannot find the backend.
+                    </p>
+                    
+                    <div className="font-mono text-[10px] text-slate-600 bg-white border border-slate-200 px-2 py-1.5 rounded break-all">
+                      Current API: {window.location.origin.includes('github.io') ? (import.meta.env.VITE_API_URL || 'MISSING (Set VITE_API_URL)') : 'Local/Same-Origin'}
+                    </div>
+
+                    {window.location.origin.includes('github.io') && !import.meta.env.VITE_API_URL && (
+                      <div className="bg-amber-50 border border-amber-200 p-2 rounded text-[10px] text-amber-800 animate-pulse">
+                        <strong>Action Required:</strong> Copy the "App URL" from AI Studio and add it as <code className="bg-amber-100 px-1 rounded">VITE_API_URL</code> in your project's Secrets.
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {!settings.googleDriveBackup?.tokens ? (

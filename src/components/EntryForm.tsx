@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, DollarSign, Clock, X, Save } from 'lucide-react';
-import { DailyEntry } from '../types';
+import { DailyEntry, KwhRateRange } from '../types';
 
 interface EntryFormProps {
   onAdd: (income: number, wattage: number, hours: number, date?: Date, kwhRate?: number, loggedBy?: 'Tom' | 'Gen', meterReading?: number) => Promise<void>;
@@ -9,6 +9,7 @@ interface EntryFormProps {
   onCancel?: () => void;
   currency: string;
   defaultKwhRate: number;
+  rateHistory?: KwhRateRange[];
   latestMeterReading?: number;
 }
 
@@ -19,6 +20,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   onCancel,
   currency, 
   defaultKwhRate, 
+  rateHistory,
   latestMeterReading 
 }) => {
   const [income, setIncome] = useState('');
@@ -29,6 +31,29 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [kwhRate, setKwhRate] = useState(defaultKwhRate.toString());
   const [loggedBy, setLoggedBy] = useState<'Tom' | 'Gen'>('Gen');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Auto-rate selection logic based on date
+  useEffect(() => {
+    if (editingEntry) return; // Don't auto-update if editing existing entry
+    
+    if (rateHistory && rateHistory.length > 0) {
+      const range = rateHistory.find(r => {
+        if (!r.startDate || !r.endDate) return false;
+        return date >= r.startDate && date <= r.endDate;
+      });
+      if (range) {
+        setKwhRate(range.rate.toString());
+      } else {
+        // As per user request: "records that are not within those ranges should be defaulted to 0"
+        setKwhRate('0');
+      }
+    } else {
+      // If no history, use the global default but the instruction said default to 0 if ranges are missing?
+      // "records that are not within those ranges should be defaulted to 0 applied rate"
+      // If there are NO ranges, then any date is "not within those ranges".
+      setKwhRate('0');
+    }
+  }, [date, rateHistory, editingEntry]);
 
   useEffect(() => {
     if (editingEntry) {
