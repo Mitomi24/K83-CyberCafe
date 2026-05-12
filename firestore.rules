@@ -37,6 +37,12 @@ service cloud.firestore {
         && data.date is timestamp;
     }
 
+    function isValidNote(data) {
+      return data.keys().hasAll(['content', 'updatedAt'])
+        && data.content is string && data.content.size() <= 10000
+        && data.updatedAt is timestamp;
+    }
+
     // Collection Rules
     match /system/connection_test {
       allow read: if true;
@@ -58,6 +64,13 @@ service cloud.firestore {
         allow get: if isOwner(userId) && isValidId(expenseId);
         allow create, update: if isOwner(userId) && isValidId(expenseId) && isValidExpense(request.resource.data);
         allow delete: if isOwner(userId) && isValidId(expenseId);
+      }
+
+      match /notes/{noteId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(noteId);
+        allow create, update: if isOwner(userId) && isValidId(noteId) && isValidNote(request.resource.data);
+        allow delete: if isOwner(userId) && isValidId(noteId);
       }
     }
   }

@@ -35,6 +35,16 @@
         "date": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "amount", "date"]
+    },
+    "Note": {
+      "title": "System Note",
+      "description": "General operational notes",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -49,6 +59,10 @@
     "users/{userId}/expenses/{expenseId}": {
       "schema": "Expense",
       "description": "Business expenses"
+    },
+    "users/{userId}/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Operational notes for different categories"
     }
   }
 }

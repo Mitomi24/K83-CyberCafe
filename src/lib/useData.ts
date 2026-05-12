@@ -18,13 +18,14 @@ import {
 import { db } from './firebase';
 import { useAuth } from './AuthContext';
 import { getApiUrl } from './utils';
-import { DailyEntry, BusinessExpense, UserSettings, AppBackup } from '../types';
+import { DailyEntry, BusinessExpense, UserSettings, AppBackup, SystemNote } from '../types';
 import { handleFirestoreError, OperationType } from './error-handler';
 
 export function useData() {
   const { user, settings } = useAuth();
   const [entries, setEntries] = useState<DailyEntry[]>([]);
   const [expenses, setExpenses] = useState<BusinessExpense[]>([]);
+  const [notes, setNotes] = useState<SystemNote[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export function useData() {
 
     const entriesRef = collection(db, 'users', user.uid, 'entries');
     const expensesRef = collection(db, 'users', user.uid, 'expenses');
+    const notesRef = collection(db, 'users', user.uid, 'notes');
 
     const qEntries = query(entriesRef, orderBy('date', 'desc'));
     const qExpenses = query(expensesRef, orderBy('date', 'desc'));
@@ -44,14 +46,35 @@ export function useData() {
     const unsubExpenses = onSnapshot(qExpenses, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BusinessExpense));
       setExpenses(data);
-      setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/expenses`));
+
+    const unsubNotes = onSnapshot(notesRef, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SystemNote));
+      setNotes(data);
+      setLoading(false);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/notes`));
 
     return () => {
       unsubEntries();
       unsubExpenses();
+      unsubNotes();
     };
   }, [user]);
+
+  const updateNote = async (content: string, category: 'cybercafe' | 'printing' = 'cybercafe') => {
+    if (!user) return;
+    const noteId = `note_${category}`;
+    const path = `users/${user.uid}/notes/${noteId}`;
+    try {
+      await setDoc(doc(db, path), {
+        content,
+        updatedAt: Timestamp.now(),
+        category
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  };
 
   const addEntry = async (
     income: number, 
@@ -471,5 +494,5 @@ export function useData() {
     }
   };
 
-  return { entries, expenses, loading, addEntry, addExpense, removeEntry, removeExpense, updateEntry, clearAllEntries, clearAllExpenses, clearAllData, restoreBackup, recalculateAllEntryCosts, createBackup, uploadToDrive, triggerAutoBackup, updateSettings };
+  return { entries, expenses, notes, loading, addEntry, addExpense, removeEntry, removeExpense, updateEntry, clearAllEntries, clearAllExpenses, clearAllData, restoreBackup, recalculateAllEntryCosts, createBackup, uploadToDrive, triggerAutoBackup, updateSettings, updateNote };
 }

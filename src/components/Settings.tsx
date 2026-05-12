@@ -5,6 +5,8 @@ import { useAuth } from '../lib/AuthContext';
 import { useData } from '../lib/useData';
 import { APP_VERSION } from '../version';
 import { getApiUrl } from '../lib/utils';
+import { db } from '../lib/firebase';
+import { doc, getDocFromServer } from 'firebase/firestore';
 
 interface SettingsProps {
   settings: UserSettings;
@@ -696,8 +698,6 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
                         <button 
                           onClick={async () => {
                             try {
-                              const { db } = await import('../lib/firebase');
-                              const { doc, getDocFromServer } = await import('firebase/firestore');
                               const start = Date.now();
                               const snap = await getDocFromServer(doc(db, 'system', 'connection_test'));
                               alert(`Firestore Success!\nLatency: ${Date.now() - start}ms`);

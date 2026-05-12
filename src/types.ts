@@ -59,3 +59,10 @@ export interface DateRange {
   from: Date;
   to: Date;
 }
+
+export interface SystemNote {
+  id?: string;
+  content: string;
+  updatedAt: Timestamp;
+  category?: 'cybercafe' | 'printing';
+}

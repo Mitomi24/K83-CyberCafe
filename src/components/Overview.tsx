@@ -17,9 +17,15 @@ export const Overview: React.FC<OverviewProps> = ({ entries, expenses, settings,
   const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
   const netProfit = totalIncome - totalEnergyCost - totalExpenses;
   
-  const dailyAvgEnergy = entries.length > 0 ? totalEnergyCost / entries.length : 0;
+  const uniqueDays = Array.from(new Set(entries.map(e => {
+    const d = e.date.toDate();
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  }))).length || 1;
+
+  const dailyAvgIncome = totalIncome / uniqueDays;
+  const dailyAvgEnergy = totalEnergyCost / uniqueDays;
   const forecastMonthEnergy = dailyAvgEnergy * 30;
-  const forecastMonthProfit = (entries.length > 0 ? netProfit / entries.length : 0) * 30;
+  const forecastMonthProfit = (dailyAvgIncome - dailyAvgEnergy) * 30 - totalExpenses;
 
   const stats = [
     { 

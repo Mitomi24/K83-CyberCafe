@@ -14,6 +14,7 @@ import { db } from '../lib/firebase';
 
 import { PrintingForm } from './PrintingForm';
 import { Expenses } from './Expenses';
+import { NotesPanel } from './NotesPanel';
 import { MissingRecordsAlert } from './MissingRecordsAlert';
 import { isWithinInterval, parseISO, startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 import { DailyEntry } from '../types';
@@ -25,7 +26,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
-  const { entries, loading, addEntry, removeEntry, updateEntry, expenses, addExpense, removeExpense, triggerAutoBackup } = useData();
+  const { entries, loading, addEntry, removeEntry, updateEntry, expenses, addExpense, removeExpense, triggerAutoBackup, notes, updateNote } = useData();
   const { settings, user } = useAuth();
   const [activeSubTab, setActiveSubTab] = React.useState<'operations' | 'expenses'>('operations');
   const [editingEntry, setEditingEntry] = React.useState<DailyEntry | null>(null);
@@ -805,6 +806,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {category === 'printing' && (
+        <NotesPanel 
+          notes={notes} 
+          onUpdate={updateNote} 
+          category={category} 
+        />
+      )}
     </div>
   );
 };
+
