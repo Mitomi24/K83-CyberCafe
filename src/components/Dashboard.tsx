@@ -434,7 +434,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
                   currency={settings.currency} 
                   defaultKwhRate={settings.kwhRate} 
                   rateHistory={settings.rateHistory || []}
-                  latestMeterReading={filteredEntries[0]?.meterReading}
+                  latestMeterReading={
+                    editingEntry 
+                      ? filteredEntries.find(e => e.id !== editingEntry.id && e.date.toMillis() <= editingEntry.date.toMillis())?.meterReading
+                      : filteredEntries[0]?.meterReading
+                  }
                 />
               ) : (
                 <PrintingForm

@@ -18,9 +18,7 @@ if (typeof window !== 'undefined') {
 
 export const db = initializeFirestore(app, {
   localCache: memoryLocalCache(),
-  // experimentalForceLongPolling and experimentalAutoDetectLongPolling cannot be used together.
-  // We'll use AutoDetect to let the SDK choose the best path.
-  experimentalAutoDetectLongPolling: true,
+  experimentalForceLongPolling: true,
 }, firebaseConfig.firestoreDatabaseId);
 
 export const auth = getAuth(app);

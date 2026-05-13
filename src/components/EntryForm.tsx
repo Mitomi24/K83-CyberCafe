@@ -28,10 +28,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const [meterReading, setMeterReading] = useState('');
   const [hours, setHours] = useState('12');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [kwhRate, setKwhRate] = useState(defaultKwhRate.toString());
+  const [kwhRate, setKwhRate] = useState('0');
   const [loggedBy, setLoggedBy] = useState<'Tom' | 'Gen'>('Gen');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  
   // Auto-rate selection logic based on date
   useEffect(() => {
     if (editingEntry) return; // Don't auto-update if editing existing entry
@@ -48,9 +48,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         setKwhRate('0');
       }
     } else {
-      // If no history, use the global default but the instruction said default to 0 if ranges are missing?
-      // "records that are not within those ranges should be defaulted to 0 applied rate"
-      // If there are NO ranges, then any date is "not within those ranges".
+      // If no history, default to 0 as requested
       setKwhRate('0');
     }
   }, [date, rateHistory, editingEntry]);
@@ -62,7 +60,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       setMeterReading(editingEntry.meterReading?.toString() || '');
       setHours(editingEntry.durationHours.toString());
       setDate(editingEntry.date.toDate().toISOString().split('T')[0]);
-      setKwhRate((editingEntry.kwhRate || defaultKwhRate).toString());
+      setKwhRate((editingEntry.kwhRate || 0).toString());
       setLoggedBy(editingEntry.loggedBy as any || 'Gen');
     } else {
       setIncome('');
@@ -70,14 +68,14 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       setMeterReading('');
       setHours('12');
       setDate(new Date().toISOString().split('T')[0]);
-      setKwhRate(defaultKwhRate.toString());
+      setKwhRate('0');
       setLoggedBy('Gen');
     }
-  }, [editingEntry, defaultKwhRate]);
+  }, [editingEntry]);
 
   // Auto-calculate wattage if meter reading is provided
   useEffect(() => {
-    if (meterReading && latestMeterReading != null && !editingEntry) {
+    if (meterReading && latestMeterReading != null) {
       const current = parseFloat(meterReading);
       const diff = current - latestMeterReading;
       if (diff >= 0) {
@@ -86,7 +84,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
         setWattage(computedWatts.toFixed(0));
       }
     }
-  }, [meterReading, latestMeterReading, hours, editingEntry]);
+  }, [meterReading, latestMeterReading, hours]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,11 +92,12 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     
     setIsSubmitting(true);
     const selectedDate = new Date(date);
+    const wattageNum = Number(wattage) || 0;
 
     if (editingEntry && onUpdate && editingEntry.id) {
       await onUpdate(editingEntry.id, {
         grossIncome: Number(income),
-        wattageUsage: Number(wattage),
+        wattageUsage: wattageNum,
         durationHours: Number(hours),
         date: selectedDate,
         kwhRate: Number(kwhRate),
@@ -109,7 +108,7 @@ export const EntryForm: React.FC<EntryFormProps> = ({
     } else {
       await onAdd(
         Number(income), 
-        Number(wattage), 
+        wattageNum, 
         Number(hours), 
         selectedDate, 
         Number(kwhRate), 
@@ -194,55 +193,36 @@ export const EntryForm: React.FC<EntryFormProps> = ({
           </div>
           
           {latestMeterReading == null && (
-             <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3 animate-in fade-in slide-in-from-top-1 duration-300">
-               <div className="flex items-center gap-2 text-amber-600 mb-1">
-                 <Zap size={14} />
-                 <span className="text-[10px] font-bold uppercase">Usage Calculation Seed</span>
+             <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
+               <div className="flex items-center gap-2 text-slate-500 mb-1">
+                 <span className="text-[9px] font-black uppercase tracking-widest">Initial Reading Calc Seed</span>
                </div>
                
-               <div className="grid grid-cols-2 gap-2">
-                 <div>
-                   <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Initial/Prev Reading</label>
-                   <input
-                     type="number"
-                     step="0.001"
-                     placeholder="Baseline"
-                     className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-mono"
-                     onChange={(e) => {
-                       const prev = parseFloat(e.target.value);
-                       const current = parseFloat(meterReading);
-                       if (!isNaN(prev) && !isNaN(current)) {
-                         const diff = current - prev;
-                         const h = parseFloat(hours) || 12;
-                         if (diff >= 0) setWattage(((diff * 1000) / h).toFixed(0));
-                       }
-                     }}
-                   />
-                 </div>
-                 <div>
-                   <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Manual Watts (Alt)</label>
-                   <input
-                     type="number"
-                     value={wattage}
-                     onChange={(e) => setWattage(e.target.value)}
-                     placeholder="Manual W"
-                     className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded text-xs font-mono"
-                   />
-                 </div>
+               <div>
+                 <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Baseline/Prev Reading</label>
+                 <input
+                   type="number"
+                   step="0.001"
+                   placeholder="Meter value before this entry"
+                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono"
+                   onChange={(e) => {
+                     const prev = parseFloat(e.target.value);
+                     const current = parseFloat(meterReading);
+                     if (!isNaN(prev) && !isNaN(current)) {
+                       const diff = current - prev;
+                       const h = parseFloat(hours) || 12;
+                       if (diff >= 0) setWattage(((diff * 1000) / h).toFixed(0));
+                     }
+                   }}
+                 />
                </div>
-               <p className="text-[9px] text-slate-400 italic">Provide the previous meter reading or manual wattage to calculate usage for this first entry.</p>
              </div>
           )}
 
           <div className="flex justify-between items-center mt-2 px-1">
             <p className="text-[10px] text-slate-400 uppercase font-bold">
-              {latestMeterReading != null ? `Prev: ${latestMeterReading.toFixed(3)}` : "Needs priming"}
+              {latestMeterReading != null ? `Prev: ${latestMeterReading.toFixed(3)}` : ""}
             </p>
-            {parseFloat(wattage) > 0 && (
-              <p className="text-[10px] text-indigo-600 font-bold uppercase flex items-center gap-1">
-                <Zap size={10} className="fill-indigo-600" /> {wattage}W {latestMeterReading != null ? 'Computed' : 'Manual'}
-              </p>
-            )}
           </div>
         </div>
 
