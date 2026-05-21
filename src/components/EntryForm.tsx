@@ -164,8 +164,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               step="0.01"
               value={income}
               onChange={(e) => setIncome(e.target.value)}
+              onWheel={(e) => (e.target as HTMLInputElement).blur()}
               placeholder="0.00"
-              className="w-full pl-12 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-mono"
+              className="w-full pl-12 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               required
             />
           </div>
@@ -186,8 +187,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               step="0.001"
               value={meterReading}
               onChange={(e) => setMeterReading(e.target.value)}
+              onWheel={(e) => (e.target as HTMLInputElement).blur()}
               placeholder={latestMeterReading != null ? `Last: ${latestMeterReading}` : "Enter Current Reading"}
-              className="w-full px-3 py-3 bg-indigo-50/50 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-xl font-mono font-bold text-indigo-900"
+              className="w-full px-3 py-3 bg-indigo-50/50 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-xl font-mono font-bold text-indigo-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               required
             />
           </div>
@@ -236,9 +238,10 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               type="number"
               value={hours}
               onChange={(e) => setHours(e.target.value)}
+              onWheel={(e) => (e.target as HTMLInputElement).blur()}
               placeholder="12"
               max="24"
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-mono"
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               required
             />
           </div>
@@ -254,7 +257,8 @@ export const EntryForm: React.FC<EntryFormProps> = ({
               step="0.01"
               value={kwhRate}
               onChange={(e) => setKwhRate(e.target.value)}
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-mono"
+              onWheel={(e) => (e.target as HTMLInputElement).blur()}
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               required
             />
           </div>
