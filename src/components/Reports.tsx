@@ -3,7 +3,7 @@ import { useData } from '../lib/useData';
 import { useAuth } from '../lib/AuthContext';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { FileText, Filter, Calendar, Download, Monitor, Printer, History as HistoryIcon, TrendingUp, DollarSign } from 'lucide-react';
-import { formatCurrency, cn } from '../lib/utils';
+import { formatCurrency, cn, getEntryUsageKwh, getEntryEnergyCost, getEntryNetProfit } from '../lib/utils';
 import * as XLSX from 'xlsx';
 
 export const Reports: React.FC = () => {
@@ -20,10 +20,13 @@ export const Reports: React.FC = () => {
     const start = startOfDay(parseISO(dateRange.start));
     const end = endOfDay(parseISO(dateRange.end));
 
-    const moduleEntries = entries.filter(e => 
-      (e.category || 'cybercafe') === activeModule &&
-      isWithinInterval(e.date.toDate(), { start, end })
-    );
+    const moduleEntries = entries.filter(e => {
+      const matchesModule = (e.category || 'cybercafe') === activeModule;
+      if (activeModule === 'printing' && (e.loggedBy === 'CLOSE' || e.grossIncome === 0)) {
+        return false;
+      }
+      return matchesModule && isWithinInterval(e.date.toDate(), { start, end });
+    });
 
     const moduleExpenses = expenses.filter(ex => 
       (ex.category || 'cybercafe') === activeModule &&
@@ -35,7 +38,7 @@ export const Reports: React.FC = () => {
 
   const stats = React.useMemo(() => {
     const totalIncome = filteredData.entries.reduce((acc, curr) => acc + curr.grossIncome, 0);
-    const totalCosts = filteredData.entries.reduce((acc, curr) => acc + (curr.energyCost || 0), 0);
+    const totalCosts = filteredData.entries.reduce((acc, curr) => acc + getEntryEnergyCost(curr, filteredData.entries, settings?.kwhRate || 0), 0);
     const totalExpenses = filteredData.expenses.reduce((acc, curr) => acc + curr.amount, 0);
     
     return {
@@ -44,26 +47,29 @@ export const Reports: React.FC = () => {
       expenses: totalExpenses,
       netProfit: totalIncome - totalCosts - totalExpenses
     };
-  }, [filteredData]);
+  }, [filteredData, settings?.kwhRate]);
 
   const exportReport = () => {
     if (!settings) return;
 
-    const entrySheetData = filteredData.entries.map(e => ({
-      Date: format(e.date.toDate(), 'yyyy-MM-dd HH:mm'),
-      Revenue: e.grossIncome,
-      ...(activeModule === 'cybercafe' ? {
-        'kWh Usage': (((e.wattageUsage || 0) * (e.durationHours || 0)) / 1000).toFixed(2),
-        'kWh Rate': e.kwhRate || settings.kwhRate,
-        'Energy Cost': e.energyCost,
-        'Net Profit': e.grossIncome - e.energyCost
-      } : {
-        Customer: e.customerName || 'Anonymous',
-        Platform: e.platform || 'N/A',
-        Remarks: e.remarks || ''
-      }),
-      'Logged By': e.loggedBy || 'Unknown'
-    }));
+    const entrySheetData = filteredData.entries.map(e => {
+      const isClosed = e.loggedBy === 'CLOSE' || (activeModule === 'cybercafe' && e.grossIncome === 0 && (e.wattageUsage || 0) === 0 && (e.durationHours || 0) === 0);
+      return {
+        Date: format(e.date.toDate(), 'yyyy-MM-dd HH:mm'),
+        Revenue: e.grossIncome,
+        ...(activeModule === 'cybercafe' ? {
+          'kWh Usage': getEntryUsageKwh(e, filteredData.entries).toFixed(2),
+          'kWh Rate': e.kwhRate || settings.kwhRate,
+          'Energy Cost': getEntryEnergyCost(e, filteredData.entries, settings.kwhRate),
+          'Net Profit': getEntryNetProfit(e, filteredData.entries, settings.kwhRate)
+        } : {
+          Customer: e.customerName || 'Anonymous',
+          Platform: e.platform || 'N/A',
+          Remarks: e.remarks || ''
+        }),
+        'Logged By': isClosed ? 'CLOSE' : (e.loggedBy || 'Unknown')
+      };
+    });
 
     const expenseSheetData = filteredData.expenses.map(ex => ({
       Date: format(ex.date.toDate(), 'yyyy-MM-dd'),
@@ -241,8 +247,12 @@ export const Reports: React.FC = () => {
                         {format(entry.date.toDate(), 'MMM dd, yyyy HH:mm')}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[9px] font-bold uppercase">
-                          {entry.loggedBy || 'Unknown'}
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                          entry.loggedBy === 'CLOSE' || (activeModule === 'cybercafe' && entry.grossIncome === 0 && (entry.wattageUsage || 0) === 0 && (entry.durationHours || 0) === 0)
+                            ? 'bg-amber-100 border-amber-200 text-amber-700 font-extrabold'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {entry.loggedBy === 'CLOSE' || (activeModule === 'cybercafe' && entry.grossIncome === 0 && (entry.wattageUsage || 0) === 0 && (entry.durationHours || 0) === 0) ? 'CLOSE' : (entry.loggedBy || 'Unknown')}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600">
@@ -251,10 +261,10 @@ export const Reports: React.FC = () => {
                       {activeModule === 'cybercafe' ? (
                         <>
                           <td className="px-6 py-4 text-right font-mono text-slate-500">
-                            {(((entry.wattageUsage || 0) * (entry.durationHours || 0)) / 1000).toFixed(2)}
+                            {getEntryUsageKwh(entry, filteredData.entries).toFixed(2)}
                           </td>
                           <td className="px-6 py-4 text-right font-mono text-amber-600">
-                            {formatCurrency(entry.energyCost || 0, settings.currency)}
+                            {formatCurrency(getEntryEnergyCost(entry, filteredData.entries, settings?.kwhRate || 0), settings?.currency)}
                           </td>
                         </>
                       ) : (

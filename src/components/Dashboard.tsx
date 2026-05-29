@@ -7,7 +7,7 @@ import { useAuth } from '../lib/AuthContext';
 import { format } from 'date-fns';
 import { Trash2, History as HistoryIcon, Download, ChevronLeft, ChevronRight, ArrowUpDown, TrendingUp, Edit2, CloudOff, Link as LinkIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { formatCurrency, cn, getApiUrl } from '../lib/utils';
+import { formatCurrency, cn, getApiUrl, isDevMode, getEntryUsageKwh, getEntryEnergyCost, getEntryNetProfit } from '../lib/utils';
 import * as XLSX from 'xlsx';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -52,7 +52,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
 
   // Filter content by category
   const filteredEntries = React.useMemo(() => {
-    return entries.filter(e => (e.category || 'cybercafe') === category);
+    return entries.filter(e => {
+      const matchesCat = (e.category || 'cybercafe') === category;
+      if (category === 'printing' && (e.loggedBy === 'CLOSE' || e.grossIncome === 0)) {
+        return false;
+      }
+      return matchesCat;
+    });
   }, [entries, category]);
 
   const filteredExpenses = React.useMemo(() => {
@@ -60,7 +66,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
   }, [expenses, category]);
 
   const handleMarkClosed = async (date: Date) => {
-    await addEntry(0, 0, 0, date, undefined, undefined, undefined, category);
+    let finalMeter: number | undefined = undefined;
+
+    if (category === 'cybercafe') {
+      const sortedBefore = [...filteredEntries]
+        .filter(e => e.date.toDate() <= date && e.meterReading != null)
+        .sort((a, b) => b.date.toMillis() - a.date.toMillis());
+      const prevMeter = sortedBefore[0]?.meterReading;
+      finalMeter = prevMeter !== undefined ? prevMeter : (filteredEntries.find(e => e.meterReading != null)?.meterReading || undefined);
+    }
+
+    await addEntry(0, 0, 0, date, undefined, 'CLOSE', finalMeter, category);
   };
 
   const sortedEntries = React.useMemo(() => {
@@ -78,16 +94,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
           valB = b.grossIncome;
           break;
         case 'usage':
-          valA = (a.wattageUsage * a.durationHours) / 1000;
-          valB = (b.wattageUsage * b.durationHours) / 1000;
+          valA = getEntryUsageKwh(a, filteredEntries);
+          valB = getEntryUsageKwh(b, filteredEntries);
           break;
         case 'cost':
-          valA = a.energyCost;
-          valB = b.energyCost;
+          valA = getEntryEnergyCost(a, filteredEntries, settings.kwhRate);
+          valB = getEntryEnergyCost(b, filteredEntries, settings.kwhRate);
           break;
         case 'profit':
-          valA = a.grossIncome - a.energyCost;
-          valB = b.grossIncome - b.energyCost;
+          valA = getEntryNetProfit(a, filteredEntries, settings.kwhRate);
+          valB = getEntryNetProfit(b, filteredEntries, settings.kwhRate);
           break;
         case 'meter':
           valA = a.meterReading || 0;
@@ -222,27 +238,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
       );
     }
 
-    const entrySheetData = exportEntries.map(e => ({
-      Date: category === 'printing' 
-        ? format(e.date.toDate(), 'yyyy-MM-dd HH:mm')
-        : format(e.date.toDate(), 'yyyy-MM-dd'),
-      Income: e.grossIncome,
-      Category: e.category || 'cybercafe',
-      'Logged By': e.loggedBy || 'Unknown',
-      ...(category === 'cybercafe' ? {
-        'Wattage (W)': e.wattageUsage,
-        'Duration (h)': e.durationHours,
-        'kWh Rate Used': e.kwhRate || settings.kwhRate,
-        'Energy Cost': e.energyCost,
-        'Net Profit': e.grossIncome - e.energyCost,
-        'Cumulative kWh': e.meterReading || 0
-      } : {
-        Platform: e.platform || 'N/A',
-        Customer: e.customerName || 'Anonymous',
-        Remarks: e.remarks || '',
-        'File Link': e.fileLink || ''
-      })
-    }));
+    const entrySheetData = exportEntries.map(e => {
+      const isClosed = e.loggedBy === 'CLOSE' || (category === 'cybercafe' && e.grossIncome === 0 && (e.wattageUsage || 0) === 0 && (e.durationHours || 0) === 0);
+      const displayLoggedBy = isClosed ? 'CLOSE' : (e.loggedBy || 'Unknown');
+      return {
+        Date: category === 'printing' 
+          ? format(e.date.toDate(), 'yyyy-MM-dd HH:mm')
+          : format(e.date.toDate(), 'yyyy-MM-dd'),
+        Income: e.grossIncome,
+        Category: e.category || 'cybercafe',
+        'Logged By': displayLoggedBy,
+        ...(category === 'cybercafe' ? {
+          'Wattage (W)': e.wattageUsage,
+          'Duration (h)': e.durationHours,
+          'kWh Rate Used': e.kwhRate || settings.kwhRate,
+          'Energy Cost': getEntryEnergyCost(e, filteredEntries, settings.kwhRate),
+          'Net Profit': getEntryNetProfit(e, filteredEntries, settings.kwhRate),
+          'Cumulative kWh': e.meterReading ?? (filteredEntries.find(prev => prev.date.toMillis() < e.date.toMillis() && prev.meterReading != null)?.meterReading || 0)
+        } : {
+          Platform: e.platform || 'N/A',
+          Customer: e.customerName || 'Anonymous',
+          Remarks: e.remarks || '',
+          'File Link': e.fileLink || ''
+        })
+      };
+    });
 
     const expenseSheetData = exportExpenses.map(ex => ({
       Date: format(ex.date.toDate(), 'yyyy-MM-dd'),
@@ -275,7 +295,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
     hours: number, 
     date?: Date, 
     kwhRate?: number, 
-    loggedBy?: 'Tom' | 'Gen', 
+    loggedBy?: 'Tom' | 'Gen' | 'CLOSE', 
     meterReading?: number,
     printingData?: any
   ) => {
@@ -358,7 +378,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
   return (
     <div className="max-w-none mx-auto py-6 px-4 sm:px-6 lg:px-12 space-y-6">
       <AnimatePresence mode="wait">
-        {(!settings.googleDriveBackup?.tokens || !settings.googleDriveBackup?.folderId) && (
+        {isDevMode() && (!settings.googleDriveBackup?.tokens || !settings.googleDriveBackup?.folderId) && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -436,8 +456,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
                   rateHistory={settings.rateHistory || []}
                   latestMeterReading={
                     editingEntry 
-                      ? filteredEntries.find(e => e.id !== editingEntry.id && e.date.toMillis() <= editingEntry.date.toMillis())?.meterReading
-                      : filteredEntries[0]?.meterReading
+                      ? filteredEntries.find(e => e.id !== editingEntry.id && e.date.toMillis() <= editingEntry.date.toMillis() && e.meterReading != null)?.meterReading
+                      : filteredEntries.find(e => e.meterReading != null)?.meterReading
                   }
                 />
               ) : (
@@ -550,7 +570,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
 
             {/* Main Section */}
             <section className="col-span-12 lg:col-span-8 flex flex-col gap-6">
-              <MissingRecordsAlert entries={filteredEntries} onMarkClosed={handleMarkClosed} />
+              {category === 'cybercafe' && (
+                <MissingRecordsAlert entries={filteredEntries} onMarkClosed={handleMarkClosed} />
+              )}
               <Overview entries={filteredEntries} expenses={filteredExpenses} settings={settings} category={category} />
               
               <TrendsChart entries={filteredEntries} expenses={filteredExpenses} settings={settings} category={category} />
@@ -657,8 +679,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
                                   : format(entry.date.toDate(), 'MMM dd, yyyy')}
                               </td>
                               <td className="px-6 py-4">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${entry.loggedBy === 'Tom' ? 'bg-blue-100 text-blue-700' : entry.loggedBy === 'Gen' ? 'bg-pink-100 text-pink-700' : 'bg-slate-100 text-slate-500'}`}>
-                                  {entry.loggedBy || '???'}
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${
+                                  entry.loggedBy === 'Tom' 
+                                    ? 'bg-blue-100 text-blue-700' 
+                                    : entry.loggedBy === 'Gen' 
+                                      ? 'bg-pink-100 text-pink-700' 
+                                      : (entry.loggedBy === 'CLOSE' || (category === 'cybercafe' && entry.grossIncome === 0 && (entry.wattageUsage || 0) === 0 && (entry.durationHours || 0) === 0))
+                                        ? 'bg-amber-150 border-amber-250 text-amber-700 font-extrabold bg-amber-50'
+                                        : 'bg-slate-100 text-slate-500'
+                                }`}>
+                                  {(entry.loggedBy === 'CLOSE' || (category === 'cybercafe' && entry.grossIncome === 0 && (entry.wattageUsage || 0) === 0 && (entry.durationHours || 0) === 0)) ? 'CLOSE' : (entry.loggedBy || '???')}
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-emerald-600 font-mono font-bold">
@@ -667,19 +697,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ category }) => {
                               {category === 'cybercafe' ? (
                                 <>
                                   <td className="px-6 py-4 font-mono text-[11px] text-slate-500">
-                                    {(((entry.wattageUsage || 0) * (entry.durationHours || 0)) / 1000).toFixed(2)} kWh
+                                    {getEntryUsageKwh(entry, filteredEntries).toFixed(2)} kWh
                                   </td>
                                   <td className="px-6 py-4 font-mono text-[11px] text-slate-400">
                                     {entry.kwhRate != null ? entry.kwhRate.toFixed(2) : settings.kwhRate.toFixed(2)}
                                   </td>
                                   <td className="px-6 py-4 text-amber-600 font-mono font-bold">
-                                    {formatCurrency(entry.energyCost, settings.currency)}
+                                    {formatCurrency(getEntryEnergyCost(entry, filteredEntries, settings.kwhRate), settings.currency)}
                                   </td>
                                   <td className="px-6 py-4 text-indigo-600 font-mono font-bold">
-                                    {formatCurrency(entry.grossIncome - entry.energyCost, settings.currency)}
+                                    {formatCurrency(getEntryNetProfit(entry, filteredEntries, settings.kwhRate), settings.currency)}
                                   </td>
                                   <td className="px-6 py-4 text-slate-600 font-mono text-[11px] font-bold bg-slate-50/30">
-                                    {entry.meterReading != null ? entry.meterReading.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : '—'}
+                                    {(() => {
+                                      const val = entry.meterReading ?? filteredEntries.find(prev => prev.date.toMillis() < entry.date.toMillis() && prev.meterReading != null)?.meterReading;
+                                      return val != null ? (
+                                        <span className={entry.meterReading == null ? "text-slate-400 italic font-medium" : ""}>
+                                          {val.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                                        </span>
+                                      ) : '—';
+                                    })()}
                                   </td>
                                 </>
                               ) : (

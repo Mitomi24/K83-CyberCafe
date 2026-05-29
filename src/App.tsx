@@ -8,14 +8,34 @@ import { Login } from './components/Login';
 import { Reports } from './components/Reports';
 import { useData } from './lib/useData';
 import { APP_VERSION } from './version';
+import { WhatsNewModal } from './components/WhatsNewModal';
 
 const AppContent: React.FC = () => {
   const { user, loading, settings, updateSettings } = useAuth();
   const [activeView, setActiveView] = useState<'cybercafe' | 'printing' | 'reports' | 'settings'>('cybercafe');
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
 
   useEffect(() => {
     document.title = `K83 Management v${APP_VERSION}`;
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      const key = `k83_whats_new_seen_${APP_VERSION}_${user.uid}`;
+      const hasSeen = localStorage.getItem(key);
+      if (!hasSeen) {
+        setShowWhatsNew(true);
+      }
+    }
+  }, [user]);
+
+  const handleCloseWhatsNew = () => {
+    if (user) {
+      const key = `k83_whats_new_seen_${APP_VERSION}_${user.uid}`;
+      localStorage.setItem(key, 'true');
+    }
+    setShowWhatsNew(false);
+  };
 
   if (loading) {
     return (
@@ -34,7 +54,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 transition-colors duration-300">
-      <Navbar onNavigate={setActiveView} activeView={activeView} />
+      <Navbar onNavigate={setActiveView} activeView={activeView} onShowWhatsNew={() => setShowWhatsNew(true)} />
       
       <main className="transition-all duration-300 ease-in-out">
         {activeView === 'cybercafe' && <Dashboard category="cybercafe" />}
@@ -57,6 +77,12 @@ const AppContent: React.FC = () => {
           </p>
         </div>
       </footer>
+
+      <WhatsNewModal 
+        isOpen={showWhatsNew} 
+        onClose={handleCloseWhatsNew} 
+        currentVersion={APP_VERSION} 
+      />
     </div>
   );
 };

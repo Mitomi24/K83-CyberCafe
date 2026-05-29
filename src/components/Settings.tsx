@@ -4,7 +4,7 @@ import { Settings as SettingsIcon, Info, Database, Trash2, AlertTriangle, Calend
 import { useAuth } from '../lib/AuthContext';
 import { useData } from '../lib/useData';
 import { APP_VERSION } from '../version';
-import { getApiUrl } from '../lib/utils';
+import { getApiUrl, isDevMode } from '../lib/utils';
 import { db } from '../lib/firebase';
 import { doc, getDocFromServer } from 'firebase/firestore';
 
@@ -580,268 +580,270 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
 
       <div className="mt-12 space-y-8">
         {/* Google Drive Auto-Backup */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit mt-8">
-          <div className="p-6 border-b border-slate-100 bg-indigo-50/10 flex items-center gap-2">
-            <UploadCloud size={18} className="text-indigo-600" />
-            <h3 className="font-bold text-slate-800 uppercase tracking-widest text-[10px]">
-              Google Drive Auto-Backup
-            </h3>
-          </div>
-          <div className="p-8">
-            <div className="flex flex-col md:flex-row gap-8 items-start">
-              <div className="flex-1 space-y-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-bold text-slate-800 tracking-tight">Cloud Data Protection</span>
-                  <p className="text-[10px] text-slate-500 leading-relaxed">
-                    Automatically upload a secure JSON backup to your Google Drive every day when you access the system.
-                  </p>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
-                      <LinkIcon size={12} className="text-indigo-500" /> Backend API Connection
-                    </span>
-                    <button
-                      onClick={() => {
-                        const url = window.location.origin.includes('github.io') ? (import.meta.env.VITE_API_URL || '') : window.location.origin;
-                        if (!url) {
-                          alert('API URL is not set yet.');
-                          return;
-                        }
-                        navigator.clipboard.writeText(url);
-                        alert('URL copied! Set this as VITE_API_URL in your environment secrets.');
-                      }}
-                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 transition-colors"
-                    >
-                      Copy App URL
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <p className="text-[11px] text-slate-600 leading-relaxed italic">
-                      If you see <span className="font-mono bg-slate-100 px-1 rounded text-red-500">Unexpected token &lt;</span>, it means your frontend is served from a different domain (like GitHub) and cannot find the backend.
+        {isDevMode() && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit mt-8">
+            <div className="p-6 border-b border-slate-100 bg-indigo-50/10 flex items-center gap-2">
+              <UploadCloud size={18} className="text-indigo-600" />
+              <h3 className="font-bold text-slate-800 uppercase tracking-widest text-[10px]">
+                Google Drive Auto-Backup
+              </h3>
+            </div>
+            <div className="p-8">
+              <div className="flex flex-col md:flex-row gap-8 items-start">
+                <div className="flex-1 space-y-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-bold text-slate-800 tracking-tight">Cloud Data Protection</span>
+                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                      Automatically upload a secure JSON backup to your Google Drive every day when you access the system.
                     </p>
-                    
-                    <div className="space-y-2">
-                       <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Manual API Override (Runtime)</label>
-                       <div className="flex gap-2">
-                        <input 
-                          type="text"
-                          value={apiOverride}
-                          onChange={(e) => saveApiOverride(e.target.value)}
-                          placeholder="Paste AI Studio App URL here..."
-                          className="flex-1 font-mono text-[10px] text-slate-600 bg-white border border-slate-200 px-2 py-1.5 rounded outline-none focus:border-indigo-500 transition-all"
-                        />
-                        {apiOverride && (
-                          <button 
-                            onClick={() => {
-                              saveApiOverride('');
-                              window.location.reload();
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-red-500 bg-white border border-slate-200 rounded"
-                            title="Clear override"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                       </div>
-                       <p className="text-[9px] text-slate-400 italic">Overrides VITE_API_URL. Requires reload to apply fully.</p>
-                    </div>
+                  </div>
 
-                    <div className="bg-slate-100/50 p-2 rounded space-y-1">
-                      <div className="flex items-center justify-between text-[9px] text-slate-500 font-bold uppercase tracking-tight">
-                        <span>Current Active API</span>
-                        {import.meta.env.VITE_API_URL ? <span className="text-emerald-500">Build-set</span> : <span className="text-slate-400">Not set in build</span>}
-                      </div>
-                      <div className="font-mono text-[10px] text-slate-600 break-all px-1">
-                        {apiOverride || import.meta.env.VITE_API_URL || 'Local / Same-Origin'}
-                      </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
+                        <LinkIcon size={12} className="text-indigo-500" /> Backend API Connection
+                      </span>
+                      <button
+                        onClick={() => {
+                          const url = window.location.origin.includes('github.io') ? (import.meta.env.VITE_API_URL || '') : window.location.origin;
+                          if (!url) {
+                            alert('API URL is not set yet.');
+                            return;
+                          }
+                          navigator.clipboard.writeText(url);
+                          alert('URL copied! Set this as VITE_API_URL in your environment secrets.');
+                        }}
+                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 transition-colors"
+                      >
+                        Copy App URL
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <p className="text-[11px] text-slate-600 leading-relaxed italic">
+                        If you see <span className="font-mono bg-slate-100 px-1 rounded text-red-500">Unexpected token &lt;</span>, it means your frontend is served from a different domain (like GitHub) and cannot find the backend.
+                      </p>
                       
-                      { (apiOverride || import.meta.env.VITE_API_URL || '').includes('ais-dev') && (
-                        <div className="bg-red-50 border border-red-200 p-2 rounded text-[10px] text-red-800 mt-2">
-                          <strong>URL Mismatch:</strong> You are using a <b>Development URL</b> (ais-dev). CORS calls from external domains (GitHub) will likely fail. Please use the <b>Shared App URL</b> (ais-pre) from AI Studio.
+                      <div className="space-y-2">
+                         <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Manual API Override (Runtime)</label>
+                         <div className="flex gap-2">
+                          <input 
+                            type="text"
+                            value={apiOverride}
+                            onChange={(e) => saveApiOverride(e.target.value)}
+                            placeholder="Paste AI Studio App URL here..."
+                            className="flex-1 font-mono text-[10px] text-slate-600 bg-white border border-slate-200 px-2 py-1.5 rounded outline-none focus:border-indigo-500 transition-all"
+                          />
+                          {apiOverride && (
+                            <button 
+                              onClick={() => {
+                                saveApiOverride('');
+                                window.location.reload();
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-red-500 bg-white border border-slate-200 rounded"
+                              title="Clear override"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                         </div>
+                         <p className="text-[9px] text-slate-400 italic">Overrides VITE_API_URL. Requires reload to apply fully.</p>
+                      </div>
+
+                      <div className="bg-slate-100/50 p-2 rounded space-y-1">
+                        <div className="flex items-center justify-between text-[9px] text-slate-500 font-bold uppercase tracking-tight">
+                          <span>Current Active API</span>
+                          {import.meta.env.VITE_API_URL ? <span className="text-emerald-500">Build-set</span> : <span className="text-slate-400">Not set in build</span>}
+                        </div>
+                        <div className="font-mono text-[10px] text-slate-600 break-all px-1">
+                          {apiOverride || import.meta.env.VITE_API_URL || 'Local / Same-Origin'}
+                        </div>
+                        
+                        { (apiOverride || import.meta.env.VITE_API_URL || '').includes('ais-dev') && (
+                          <div className="bg-red-50 border border-red-200 p-2 rounded text-[10px] text-red-800 mt-2">
+                            <strong>URL Mismatch:</strong> You are using a <b>Development URL</b> (ais-dev). CORS calls from external domains (GitHub) will likely fail. Please use the <b>Shared App URL</b> (ais-pre) from AI Studio.
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 mt-2">
+                          <button 
+                            onClick={async () => {
+                              const testUrl = getApiUrl('/api/health');
+                              try {
+                                // We use redirect: 'manual' to catch 302s that indicate auth issues
+                                const res = await fetch(testUrl, {
+                                  method: 'GET',
+                                  headers: { 
+                                    'Accept': 'application/json',
+                                    'X-App-Version': APP_VERSION 
+                                  },
+                                  redirect: 'manual' 
+                                });
+                                
+                                if (res.type === 'opaqueredirect' || res.status === 302 || res.status === 301) {
+                                  alert(`REDIRECT DETECTED (HTTP ${res.status})\n\nCRITICAL: The Shared App URL is redirecting to a login page. This means the app is NOT SHARED PUBLICLY.\n\nTo fix this:\n1. Open AI Studio.\n2. Click "Share" in the top right.\n3. Ensure "Public / Shared with everyone" or similar is selected.\n4. Use the Shared App URL (ais-pre), NOT the development URL (ais-dev).`);
+                                  return;
+                                }
+
+                                if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                                const data = await res.json();
+                                alert(`API Success!\nStatus: ${data.status}\nBackend: ${new URL(testUrl).hostname}`);
+                              } catch (err: any) {
+                                alert(`API Failed!\nError: ${err.message}\nThis is likely a CORS issue or the URL is unreachable.`);
+                              }
+                            }}
+                            className="flex-1 text-[9px] font-bold text-indigo-600 hover:bg-white py-1 rounded transition-colors border border-indigo-100/50"
+                          >
+                            Test API
+                          </button>
+                          <button 
+                            onClick={async () => {
+                              try {
+                                const start = Date.now();
+                                const snap = await getDocFromServer(doc(db, 'system', 'connection_test'));
+                                alert(`Firestore Success!\nLatency: ${Date.now() - start}ms`);
+                              } catch (err: any) {
+                                alert(`Firestore Failed!\nCode: ${err.code}\nMessage: ${err.message}`);
+                              }
+                            }}
+                            className="flex-1 text-[9px] font-bold text-emerald-600 hover:bg-white py-1 rounded transition-colors border border-emerald-100/50"
+                          >
+                            Test Firestore
+                          </button>
+                        </div>
+                      </div>
+
+                      {window.location.origin.includes('github.io') && !import.meta.env.VITE_API_URL && !apiOverride && (
+                        <div className="bg-amber-50 border border-amber-200 p-2 rounded text-[10px] text-amber-800 animate-pulse">
+                          <strong>Action Required:</strong> Copy the <b>Shared App URL</b> (starting with <code className="bg-amber-100 px-1 rounded">ais-pre</code>) from AI Studio and paste it in the "Manual API Override" box above. Avoid using the <code className="bg-amber-100 px-1 rounded">ais-dev</code> URL as it requires an active session.
                         </div>
                       )}
-
-                      <div className="flex gap-2 mt-2">
-                        <button 
-                          onClick={async () => {
-                            const testUrl = getApiUrl('/api/health');
-                            try {
-                              // We use redirect: 'manual' to catch 302s that indicate auth issues
-                              const res = await fetch(testUrl, {
-                                method: 'GET',
-                                headers: { 
-                                  'Accept': 'application/json',
-                                  'X-App-Version': APP_VERSION 
-                                },
-                                redirect: 'manual' 
-                              });
-                              
-                              if (res.type === 'opaqueredirect' || res.status === 302 || res.status === 301) {
-                                alert(`REDIRECT DETECTED (HTTP ${res.status})\n\nCRITICAL: The Shared App URL is redirecting to a login page. This means the app is NOT SHARED PUBLICLY.\n\nTo fix this:\n1. Open AI Studio.\n2. Click "Share" in the top right.\n3. Ensure "Public / Shared with everyone" or similar is selected.\n4. Use the Shared App URL (ais-pre), NOT the development URL (ais-dev).`);
-                                return;
-                              }
-
-                              if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-                              const data = await res.json();
-                              alert(`API Success!\nStatus: ${data.status}\nBackend: ${new URL(testUrl).hostname}`);
-                            } catch (err: any) {
-                              alert(`API Failed!\nError: ${err.message}\nThis is likely a CORS issue or the URL is unreachable.`);
-                            }
-                          }}
-                          className="flex-1 text-[9px] font-bold text-indigo-600 hover:bg-white py-1 rounded transition-colors border border-indigo-100/50"
-                        >
-                          Test API
-                        </button>
-                        <button 
-                          onClick={async () => {
-                            try {
-                              const start = Date.now();
-                              const snap = await getDocFromServer(doc(db, 'system', 'connection_test'));
-                              alert(`Firestore Success!\nLatency: ${Date.now() - start}ms`);
-                            } catch (err: any) {
-                              alert(`Firestore Failed!\nCode: ${err.code}\nMessage: ${err.message}`);
-                            }
-                          }}
-                          className="flex-1 text-[9px] font-bold text-emerald-600 hover:bg-white py-1 rounded transition-colors border border-emerald-100/50"
-                        >
-                          Test Firestore
-                        </button>
-                      </div>
                     </div>
-
-                    {window.location.origin.includes('github.io') && !import.meta.env.VITE_API_URL && !apiOverride && (
-                      <div className="bg-amber-50 border border-amber-200 p-2 rounded text-[10px] text-amber-800 animate-pulse">
-                        <strong>Action Required:</strong> Copy the <b>Shared App URL</b> (starting with <code className="bg-amber-100 px-1 rounded">ais-pre</code>) from AI Studio and paste it in the "Manual API Override" box above. Avoid using the <code className="bg-amber-100 px-1 rounded">ais-dev</code> URL as it requires an active session.
-                      </div>
-                    )}
                   </div>
-                </div>
 
-                {!settings.googleDriveBackup?.tokens ? (
-                  <div className="space-y-4">
-                    <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-3 rounded-lg border border-amber-100 italic">
-                      Drive permissions were not granted during login. You must manually link your account to enable cloud backups.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleConnectDrive}
-                      className="w-fit px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-md hover:bg-slate-900"
-                    >
-                      <LinkIcon size={16} />
-                      Grant Drive Permissions
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg w-fit border border-indigo-100">
-                      <CheckCircle2 size={16} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Linked to Account: {user?.email}</span>
-                    </div>
-                    
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => toggleDriveBackup(!settings.googleDriveBackup?.enabled)}
-                        className={`px-6 py-2.5 font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-sm border-2 ${settings.googleDriveBackup?.enabled ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
-                      >
-                        {settings.googleDriveBackup?.enabled ? 'Auto-Backup: Enabled' : 'Auto-Backup: Disabled'}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleManualCloudBackup}
-                        disabled={isUploadingToDrive}
-                        className="px-6 py-2.5 bg-white border-2 border-slate-200 text-slate-600 font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 disabled:opacity-50"
-                      >
-                        <UploadCloud size={16} className={isUploadingToDrive ? 'animate-bounce' : ''} />
-                        {isUploadingToDrive ? 'Upload Backup Now' : 'Upload Backup Now'}
-                      </button>
-                      
+                  {!settings.googleDriveBackup?.tokens ? (
+                    <div className="space-y-4">
+                      <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-3 rounded-lg border border-amber-100 italic">
+                        Drive permissions were not granted during login. You must manually link your account to enable cloud backups.
+                      </p>
                       <button
                         type="button"
                         onClick={handleConnectDrive}
-                        className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 underline underline-offset-4 ml-auto"
+                        className="w-fit px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-md hover:bg-slate-900"
                       >
-                        Sync New Permissions
+                        <LinkIcon size={16} />
+                        Grant Drive Permissions
                       </button>
                     </div>
-
-                    <div className="mt-8 pt-8 border-t border-slate-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          <HistoryIcon size={16} className="text-slate-400" />
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cloud Recovery Points</h4>
-                        </div>
-                        <button 
-                          onClick={fetchDriveBackups}
-                          disabled={isLoadingDriveFiles}
-                          className="text-[9px] font-bold uppercase tracking-widest text-indigo-600 flex items-center gap-1 hover:underline disabled:opacity-50"
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg w-fit border border-indigo-100">
+                        <CheckCircle2 size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Linked to Account: {user?.email}</span>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleDriveBackup(!settings.googleDriveBackup?.enabled)}
+                          className={`px-6 py-2.5 font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-sm border-2 ${settings.googleDriveBackup?.enabled ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
                         >
-                          <RefreshCw size={12} className={isLoadingDriveFiles ? 'animate-spin' : ''} />
-                          Check Drive
+                          {settings.googleDriveBackup?.enabled ? 'Auto-Backup: Enabled' : 'Auto-Backup: Disabled'}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleManualCloudBackup}
+                          disabled={isUploadingToDrive}
+                          className="px-6 py-2.5 bg-white border-2 border-slate-200 text-slate-600 font-bold rounded-xl transition-all flex items-center gap-2 text-[10px] uppercase tracking-widest shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 disabled:opacity-50"
+                        >
+                          <UploadCloud size={16} className={isUploadingToDrive ? 'animate-bounce' : ''} />
+                          {isUploadingToDrive ? 'Upload Backup Now' : 'Upload Backup Now'}
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={handleConnectDrive}
+                          className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 underline underline-offset-4 ml-auto"
+                        >
+                          Sync New Permissions
                         </button>
                       </div>
 
-                      {driveFiles.length > 0 ? (
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-                          {driveFiles.map((file) => (
-                            <div key={file.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 hover:border-indigo-200 transition-colors group">
-                              <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-slate-700">{file.name}</span>
-                                <span className="text-[9px] text-slate-400 font-mono">
-                                  {new Date(file.createdTime).toLocaleString()} • {(file.size / 1024).toFixed(1)} KB
-                                </span>
-                              </div>
-                              <button
-                                onClick={() => handleRestoreFromDrive(file.id)}
-                                className="px-3 py-1 bg-white border border-slate-200 rounded-md text-[9px] font-bold uppercase tracking-widest text-indigo-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all opacity-0 group-hover:opacity-100 shadow-sm"
-                              >
-                                Restore
-                              </button>
-                            </div>
-                          ))}
+                      <div className="mt-8 pt-8 border-t border-slate-100">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <HistoryIcon size={16} className="text-slate-400" />
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cloud Recovery Points</h4>
+                          </div>
+                          <button 
+                            onClick={fetchDriveBackups}
+                            disabled={isLoadingDriveFiles}
+                            className="text-[9px] font-bold uppercase tracking-widest text-indigo-600 flex items-center gap-1 hover:underline disabled:opacity-50"
+                          >
+                            <RefreshCw size={12} className={isLoadingDriveFiles ? 'animate-spin' : ''} />
+                            Check Drive
+                          </button>
                         </div>
-                      ) : (
-                        <div className="p-8 text-center text-[10px] text-slate-400 italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                          {isLoadingDriveFiles ? (
-                            <div className="flex flex-col items-center gap-2">
-                              <RefreshCw size={16} className="animate-spin text-indigo-400" />
-                              <span>Accessing Drive...</span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center gap-2">
-                              <HardDrive size={16} className="text-slate-300" />
-                              <span>No recent cloud backups found. Click "Check Drive" to scan.</span>
-                            </div>
-                          )}
+
+                        {driveFiles.length > 0 ? (
+                          <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                            {driveFiles.map((file) => (
+                              <div key={file.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100 hover:border-indigo-200 transition-colors group">
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] font-bold text-slate-700">{file.name}</span>
+                                  <span className="text-[9px] text-slate-400 font-mono">
+                                    {new Date(file.createdTime).toLocaleString()} • {(file.size / 1024).toFixed(1)} KB
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => handleRestoreFromDrive(file.id)}
+                                  className="px-3 py-1 bg-white border border-slate-200 rounded-md text-[9px] font-bold uppercase tracking-widest text-indigo-600 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all opacity-0 group-hover:opacity-100 shadow-sm"
+                                >
+                                  Restore
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-8 text-center text-[10px] text-slate-400 italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                            {isLoadingDriveFiles ? (
+                              <div className="flex flex-col items-center gap-2">
+                                <RefreshCw size={16} className="animate-spin text-indigo-400" />
+                                <span>Accessing Drive...</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-2">
+                                <HardDrive size={16} className="text-slate-300" />
+                                <span>No recent cloud backups found. Click "Check Drive" to scan.</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                  {settings.googleDriveBackup?.lastBackupDate && (
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 w-full md:w-fit min-w-[200px]">
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Last Cloud Sync</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-xl font-black text-slate-800">{settings.googleDriveBackup.lastBackupDate}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1 italic">Backup verified in Drive Folder</p>
+                      {settings.googleDriveBackup.folderId && (
+                        <div className="mt-3 pt-3 border-t border-slate-200 flex items-center gap-2">
+                          <HardDrive size={12} className="text-slate-400" />
+                          <span className="text-[9px] font-mono text-slate-400 uppercase">Remote ID: {settings.googleDriveBackup.folderId.slice(0, 8)}...</span>
                         </div>
                       )}
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
-
-                {settings.googleDriveBackup?.lastBackupDate && (
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 w-full md:w-fit min-w-[200px]">
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Last Cloud Sync</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-xl font-black text-slate-800">{settings.googleDriveBackup.lastBackupDate}</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-1 italic">Backup verified in Drive Folder</p>
-                    {settings.googleDriveBackup.folderId && (
-                      <div className="mt-3 pt-3 border-t border-slate-200 flex items-center gap-2">
-                        <HardDrive size={12} className="text-slate-400" />
-                        <span className="text-[9px] font-mono text-slate-400 uppercase">Remote ID: {settings.googleDriveBackup.folderId.slice(0, 8)}...</span>
-                      </div>
-                    )}
-                  </div>
-                )}
             </div>
           </div>
-        </div>
+        )}
 
         {/* Local Backup & Recovery */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden h-fit mt-8">

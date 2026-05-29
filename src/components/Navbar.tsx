@@ -1,14 +1,15 @@
 import React from 'react';
 import { useAuth } from '../lib/AuthContext';
-import { LogOut, LayoutDashboard, Settings as SettingsIcon, PlusCircle, ReceiptText, DollarSign, Monitor, Printer, FileText } from 'lucide-react';
+import { LogOut, LayoutDashboard, Settings as SettingsIcon, PlusCircle, ReceiptText, DollarSign, Monitor, Printer, FileText, Sparkles } from 'lucide-react';
 import { APP_VERSION } from '../version';
 
 interface NavbarProps {
   onNavigate: (view: 'cybercafe' | 'printing' | 'reports' | 'settings') => void;
   activeView: string;
+  onShowWhatsNew?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activeView }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activeView, onShowWhatsNew }) => {
   const { user, logout } = useAuth();
 
   if (!user) return null;
@@ -40,8 +41,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigate, activeView }) => {
               <h1 className="text-xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
                 K83 Management
               </h1>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <span className="text-[8px] font-mono font-bold text-indigo-500/50">v{APP_VERSION}</span>
+                {onShowWhatsNew && (
+                  <button 
+                    onClick={onShowWhatsNew}
+                    className="text-[9px] font-extrabold text-indigo-600/80 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-700 px-1.5 py-0.5 rounded-md transition-all flex items-center gap-1 uppercase tracking-wider"
+                  >
+                    <Sparkles size={10} className="text-indigo-500 animate-pulse animate-duration-1000" />
+                    What&apos;s New
+                  </button>
+                )}
               </div>
             </div>
           </div>

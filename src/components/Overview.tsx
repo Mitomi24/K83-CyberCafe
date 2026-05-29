@@ -1,6 +1,6 @@
 import React from 'react';
 import { DailyEntry, BusinessExpense, UserSettings } from '../types';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, getEntryEnergyCost } from '../lib/utils';
 import { Wallet, TrendingUp, Zap, Activity, User, ReceiptText } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -13,7 +13,7 @@ interface OverviewProps {
 
 export const Overview: React.FC<OverviewProps> = ({ entries, expenses, settings, category = 'cybercafe' }) => {
   const totalIncome = entries.reduce((acc, curr) => acc + curr.grossIncome, 0);
-  const totalEnergyCost = entries.reduce((acc, curr) => acc + (curr.energyCost || 0), 0);
+  const totalEnergyCost = entries.reduce((acc, curr) => acc + getEntryEnergyCost(curr, entries, settings.kwhRate), 0);
   const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
   const netProfit = totalIncome - totalEnergyCost - totalExpenses;
   

@@ -8,7 +8,7 @@ export interface DailyEntry {
   durationHours: number;
   energyCost: number;
   kwhRate: number;
-  loggedBy?: 'Tom' | 'Gen';
+  loggedBy?: 'Tom' | 'Gen' | 'CLOSE';
   meterReading?: number;
   category?: 'cybercafe' | 'printing';
   // Printing specific

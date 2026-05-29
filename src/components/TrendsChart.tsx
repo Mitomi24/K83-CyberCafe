@@ -14,6 +14,7 @@ import {
   Legend 
 } from 'recharts';
 import { DailyEntry, BusinessExpense, UserSettings } from '../types';
+import { getEntryEnergyCost } from '../lib/utils';
 import { format } from 'date-fns';
 import { TrendingUp, BarChart3, LineChart as LucideLineChart, AreaChart as LucideAreaChart } from 'lucide-react';
 
@@ -48,7 +49,7 @@ export const TrendsChart: React.FC<TrendsChartProps> = ({ entries, expenses, set
       current.income += e.grossIncome;
       current.customers = (current.customers || 0) + 1;
       if (!isPrinting) {
-        current.cost += (e.energyCost || 0);
+        current.cost += getEntryEnergyCost(e, entries, settings.kwhRate);
       }
       dateMap.set(key, current);
     });

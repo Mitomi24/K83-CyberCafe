@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { useAuth } from './AuthContext';
-import { getApiUrl } from './utils';
+import { getApiUrl, isDevMode } from './utils';
 import { DailyEntry, BusinessExpense, UserSettings, AppBackup, SystemNote } from '../types';
 import { handleFirestoreError, OperationType } from './error-handler';
 
@@ -82,7 +82,7 @@ export function useData() {
     hours: number, 
     customDate?: Date, 
     customKwhRate?: number, 
-    loggedBy?: 'Tom' | 'Gen', 
+    loggedBy?: 'Tom' | 'Gen' | 'CLOSE', 
     meterReading?: number, 
     category: 'cybercafe' | 'printing' = 'cybercafe',
     printingData?: {
@@ -481,6 +481,7 @@ export function useData() {
   };
 
   const triggerAutoBackup = async () => {
+    if (!isDevMode()) return;
     if (!settings?.googleDriveBackup?.enabled || !settings?.googleDriveBackup?.tokens) return;
     
     const today = new Date().toISOString().split('T')[0];
